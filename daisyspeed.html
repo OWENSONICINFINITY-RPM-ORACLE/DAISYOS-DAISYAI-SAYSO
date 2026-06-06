@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>DaisySpeed – Real GPS Speed Tracker | DaisyOS</title>
+  <!-- Firebase Auth (Google Sign-In) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <!-- TensorFlow.js + COCO-SSD for object detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0f1e;
+      color: #eef2ff;
+      overflow-x: hidden;
+      padding-bottom: 80px;
+    }
+    :root { --neon: #00f5c0; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .badge-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      background: rgba(0,245,192,0.1);
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      border: 1px solid rgba(0,245,192,0.3);
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      color: var(--neon);
+      transition: 0.2s;
+    }
+    .icon-btn:hover { background: rgba(0,245,192,0.2); }
+    .nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(10,15,30,0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(0,245,192,0.3);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.7rem;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .nav-item.active { color: var(--neon); }
+    .nav-icon { font-size: 1.5rem; }
+    .speed-card {
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(12px);
+      border-radius: 48px;
+      padding: 24px;
+      text-align: center;
+      border: 1px solid var(--neon);
+      margin-bottom: 20px;
+    }
+    .speed-value {
+      font-size: 5rem;
+      font-weight: 800;
+      font-family: monospace;
+      letter-spacing: 4px;
+    }
+    .unit-toggle {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .ar-container {
+      position: relative;
+      background: #000;
+      border-radius: 32px;
+      overflow: hidden;
+      aspect-ratio: 16/9;
+      margin-bottom: 20px;
+      border: 2px solid var(--neon);
+    }
+    #cameraFeed {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60px;
+      height: 60px;
+      transform: translate(-50%, -50%);
+      border: 2px solid var(--neon);
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.3);
+    }
+    .crosshair::before, .crosshair::after {
+      content: '';
+      position: absolute;
+      background: var(--neon);
+    }
+    .crosshair::before {
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      transform: translateY(-50%);
+    }
+    .crosshair::after {
+      top: 0;
+      left: 50%;
+      width: 2px;
+      height: 100%;
+      transform: translateX(-50%);
+    }
+    .object-label {
+      position: absolute;
+      background: rgba(0,0,0,0.7);
+      color: var(--neon);
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      bottom: 10px;
+      left: 10px;
+    }
+    button {
+      background: rgba(0,245,192,0.2);
+      border: 1px solid var(--neon);
+      padding: 8px 16px;
+      border-radius: 40px;
+      color: var(--neon);
+      cursor: pointer;
+      margin: 4px;
+    }
+    .hunting-panel {
+      background: rgba(0,0,0,0.6);
+      border-radius: 24px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    .nft-banner {
+      background: linear-gradient(135deg, #00f5c0, #0a8f6e);
+      color: #0a0f1e;
+      padding: 12px;
+      border-radius: 20px;
+      text-align: center;
+      margin: 16px 0;
+      font-weight: bold;
+    }
+    .profile-wallet {
+      font-family: monospace;
+      background: #00000066;
+      padding: 8px;
+      border-radius: 20px;
+      margin: 8px 0;
+    }
+    .disclaimer {
+      background: rgba(255,70,70,0.1);
+      border-left: 4px solid #ff4444;
+      padding: 12px 16px;
+      margin: 20px 0;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+    footer {
+      margin-top: 40px;
+      padding: 20px 0;
+      text-align: center;
+      font-size: 0.7rem;
+      border-top: 1px solid rgba(0,245,192,0.2);
+    }
+    .floating-ai {
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      background: var(--neon);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--neon);
+      z-index: 200;
+      font-size: 28px;
+      border: none;
+      color: #0a0f1e;
+    }
+    .ai-modal {
+      display: none;
+      position: fixed;
+      bottom: 160px;
+      right: 20px;
+      width: 320px;
+      background: #1e293b;
+      border-radius: 24px;
+      border: 2px solid var(--neon);
+      z-index: 201;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ai-header {
+      background: #0f172a;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--neon);
+    }
+    .ai-messages {
+      height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      font-size: 0.85rem;
+    }
+    .ai-input-area {
+      display: flex;
+      padding: 8px;
+      gap: 8px;
+      border-top: 1px solid rgba(0,245,192,0.3);
+    }
+    .ai-input-area input {
+      flex: 1;
+      padding: 8px;
+      border-radius: 40px;
+      border: none;
+      background: #0f172a;
+      color: white;
+    }
+    @media (max-width: 640px) {
+      .speed-value { font-size: 3rem; }
+      .ai-modal { width: 280px; right: 10px; bottom: 140px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="appContainer">
+  <div class="header">
+    <h2>🏁 DaisySpeed</h2>
+    <div class="badge-row">
+      <span class="badge">🎯 Real GPS</span>
+      <span class="badge">🌙 Night Vision</span>
+      <span class="badge">🎙️ Voice Control</span>
+      <div id="userWidget"></div>
+      <button class="icon-btn" id="settingsBtn">⚙️</button>
+    </div>
+  </div>
+  <div id="screenContent"></div>
+  <footer>
+    <a href="https://owensonicinfinity.netlify.app" target="_blank">OwenSonicInfinity.netlify.app</a> | 
+    <a href="https://owensonicinfinity.github.io" target="_blank">OwenSonicInfinity.github.io</a><br>
+    Cleveland, Ohio 44089 | owensonicinfinity@gmail.com<br>
+    © 2026 Douglas Owens Jr. All rights reserved.
+  </footer>
+</div>
+
+<div class="nav-bar">
+  <button class="nav-item" data-nav="speed"><span class="nav-icon">📊</span><span>Speed</span></button>
+  <button class="nav-item" data-nav="hunt"><span class="nav-icon">🏹</span><span>Hunt</span></button>
+  <button class="nav-item" data-nav="profile"><span class="nav-icon">👤</span><span>Profile</span></button>
+</div>
+
+<button class="floating-ai" id="floatingAiBtn">🤖</button>
+<div id="aiModal" class="ai-modal">
+  <div class="ai-header">
+    <span>🤖 DaisyAI <span class="badge">Autonomous</span></span>
+    <button id="closeAiModal" style="background:none; border:none; color:var(--neon); font-size:1.2rem;">✕</button>
+  </div>
+  <div id="aiMessages" class="ai-messages">
+    <div>👋 I'm DaisyAI. Ask me about speed, hunting, or your wallet.</div>
+  </div>
+  <div class="ai-input-area">
+    <button id="voiceInputBtn" style="background:none; border:none; font-size:1.2rem;">🎤</button>
+    <input type="text" id="aiInput" placeholder="Type or speak...">
+    <button id="sendAiBtn">Send</button>
+  </div>
+</div>
+
+<script>
+  // ==================== Firebase & Global State ====================
+  const firebaseConfig = {
+    apiKey: "AIzaSyDummyKeyForDemoOnly",
+    authDomain: "daisyos-demo.firebaseapp.com",
+    projectId: "daisyos-demo",
+  };
+  let auth;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+  } catch(e) { console.warn("Firebase init failed, using mock auth"); }
+
+  let currentUser = null;
+  let currentScreen = 'speed';
+  let geminiApiKey = localStorage.getItem("geminiApiKey") || "";
+  let customBgImage = localStorage.getItem("customBgImage") || "";
+  let walletBalance = parseFloat(localStorage.getItem("walletBalance")) || 5.0;
+  let userNFTs = JSON.parse(localStorage.getItem("userNFTs")) || [];
+  let userBio = localStorage.getItem("userBio") || "Speed hunter. NFT collector.";
+  let userWalletAddress = localStorage.getItem("userWalletAddress") || `0x${Math.random().toString(36).substring(2, 10)}...`;
+  let huntingLogs = JSON.parse(localStorage.getItem("huntingLogs")) || [];
+
+  // Speed tracking variables
+  let currentSpeed = 0;
+  let speedUnit = 'mph';
+  let gpsWatchId = null;
+  let lastPosition = null;
+  let lastTimestamp = 0;
+  let nightVision = false;
+  let model = null;
+  let videoStream = null;
+  let videoElement = null;
+  let canvasElement = null;
+  let ctx = null;
+  let detectionInterval = null;
+  let currentFacingMode = 'environment';
+
+  // ==================== Real GPS Speed ====================
+  function startGPS() {
+    if (!navigator.geolocation) {
+      alert("GPS not supported on this device");
+      return;
+    }
+    if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now();
+        if (lastPosition) {
+          const dt = (now - lastTimestamp) / 1000;
+          if (dt > 0.1) {
+            const distance = haversineDistance(lastPosition.coords, pos.coords);
+            const speedMs = distance / dt;
+            currentSpeed = speedMs * 2.23694;
+            currentSpeed = Math.min(250, Math.max(0, currentSpeed));
+            updateSpeedDisplay();
+          }
+        }
+        lastPosition = pos;
+        lastTimestamp = now;
+      },
+      (err) => console.warn("GPS error:", err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
+  }
+
+  function haversineDistance(coords1, coords2) {
+    const R = 6371000;
+    const lat1 = coords1.latitude * Math.PI/180;
+    const lat2 = coords2.latitude * Math.PI/180;
+    const dlat = (coords2.latitude - coords1.latitude) * Math.PI/180;
+    const dlon = (coords2.longitude - coords1.longitude) * Math.PI/180;
+    const a = Math.sin(dlat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function updateSpeedDisplay() {
+    const speedEl = document.getElementById("speedValue");
+    const unitEl = document.getElementById("unitLabel");
+    if (speedEl) {
+      let displaySpeed = speedUnit === 'mph' ? currentSpeed : currentSpeed * 1.60934;
+      speedEl.innerText = Math.floor(displaySpeed);
+    }
+    if (unitEl) unitEl.innerText = speedUnit;
+  }
+
+  // ==================== Camera & Object Detection ====================
+  async function loadModel() {
+    try {
+      model = await cocoSsd.load();
+      console.log("COCO-SSD model loaded");
+      return true;
+    } catch(e) {
+      console.warn("Model load failed:", e);
+      return false;
+    }
+  }
+
+  async function startCamera() {
+    if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: currentFacingMode } }
+      });
+      videoStream = stream;
+      if (videoElement) videoElement.srcObject = stream;
+      return true;
+    } catch(err) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        videoStream = stream;
+        if (videoElement) videoElement.srcObject = stream;
+        return true;
+      } catch(e) {
+        alert("Camera access denied");
+        return false;
+      }
+    }
+  }
+
+  async function detectObjects() {
+    if (!model || !videoElement || videoElement.readyState !== 4) return;
+    try {
+      const predictions = await model.detect(videoElement);
+      drawPredictions(predictions);
+      if (predictions.length > 0 && document.getElementById("objectLabel")) {
+        document.getElementById("objectLabel").innerHTML = `🎯 ${predictions[0].class} (${Math.round(predictions[0].score*100)}%)`;
+      }
+    } catch(e) { console.warn("Detection error", e); }
+  }
+
+  function drawPredictions(predictions) {
+    if (!canvasElement || !ctx) return;
+    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--neon').trim() || '#00f5c0';
+    ctx.fillStyle = '#00f5c0';
+    ctx.font = "16px 'Inter'";
+    for (let pred of predictions.slice(0, 3)) {
+      const [x, y, w, h] = pred.bbox;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillText(`${pred.class} (${Math.round(pred.score*100)}%)`, x, y-5);
+    }
+  }
+
+  function switchCamera() {
+    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    startCamera();
+  }
+
+  function toggleNightVision() {
+    nightVision = !nightVision;
+    if (videoElement) {
+      videoElement.style.filter = nightVision ? "brightness(1.3) contrast(1.8) hue-rotate(90deg)" : "none";
+    }
+  }
+
+  function takeSnapshot() {
+    if (!videoElement) return;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = videoElement.videoWidth;
+    offCanvas.height = videoElement.videoHeight;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.drawImage(videoElement, 0, 0);
+    const link = document.createElement('a');
+    link.download = `daisyspeed_${Date.now()}.png`;
+    link.href = offCanvas.toDataURL();
+    link.click();
+    alert("Snapshot saved. You can mint this as an NFT in your profile.");
+  }
+
+  // ==================== Voice Control ====================
+  let recognition;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+  }
+  function startVoiceCommand() {
+    if (!recognition) { alert("Voice not supported"); return; }
+    recognition.start();
+    recognition.onresult = (event) => {
+      const cmd = event.results[0][0].transcript.toLowerCase();
+      if (cmd.includes("night vision")) { toggleNightVision(); speak("Night vision toggled"); }
+      else if (cmd.includes("hunting mode")) { alert("Hunting mode activated"); speak("Hunting mode on"); }
+      else if (cmd.includes("speed")) { speak(`Current speed is ${Math.floor(currentSpeed)} ${speedUnit}`); }
+      else if (cmd.includes("mph")) { speedUnit = 'mph'; updateSpeedDisplay(); speak("Switched to miles per hour"); }
+      else if (cmd.includes("kmh") || cmd.includes("kilometers")) { speedUnit = 'kmh'; updateSpeedDisplay(); speak("Switched to kilometers per hour"); }
+      else { speak("Command not recognized. Try night vision, speed, mph, or kmh"); }
+    };
+  }
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  // ==================== Hunting Addon ====================
+  function addHuntingLog(scat, track, marking, location) {
+    huntingLogs.push({ scat, track, marking, location, date: new Date() });
+    localStorage.setItem("huntingLogs", JSON.stringify(huntingLogs));
+    if (huntingLogs.length === 1) {
+      userNFTs.push({ name: "Beginner Hunter Badge", value: "0.05 ETH" });
+      localStorage.setItem("userNFTs", JSON.stringify(userNFTs));
+      alert("🏅 You earned a Beginner Hunter NFT!");
+    } else {
+      alert("Hunt logged! +0.01 ETH reward.");
+      walletBalance += 0.01;
+      localStorage.setItem("walletBalance", walletBalance);
+    }
+  }
+
+  // ==================== UI Rendering ====================
+  function render() {
+    const container = document.getElementById('screenContent');
+    if (currentScreen === 'speed') renderSpeed(container);
+    else if (currentScreen === 'hunt') renderHunt(container);
+    else if (currentScreen === 'profile') renderProfile(container);
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      if(btn.dataset.nav === currentScreen) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    updateUserWidget();
+  }
+
+  function renderSpeed(container) {
+    container.innerHTML = `
+      <div class="disclaimer">⚠️ DISCLAIMER: You are solely responsible for your actions. Race/hunt at your own risk. No liability for misuse.</div>
+      <div class="speed-card">
+        <div class="speed-value"><span id="speedValue">0</span> <span id="unitLabel">${speedUnit}</span></div>
+        <div class="unit-toggle">
+          <button id="mphBtn" class="${speedUnit === 'mph' ? 'active' : ''}">MPH</button>
+          <button id="kmhBtn" class="${speedUnit === 'kmh' ? 'active' : ''}">KM/H</button>
+        </div>
+        <button id="voiceCmdBtn">🎤 Voice Control</button>
+        <button id="nightVisionBtn">🌙 Night Vision ${nightVision ? 'ON' : 'OFF'}</button>
+        <button id="startGpsBtn">📍 Start GPS</button>
+      </div>
+      <div class="ar-container">
+        <video id="cameraFeed" autoplay playsinline></video>
+        <canvas id="detectionCanvas"></canvas>
+        <div class="crosshair"></div>
+        <div id="objectLabel" class="object-label">🔍 Scanning...</div>
+      </div>
+      <div class="controls" style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+        <button id="switchCamBtn">🔄 Switch Camera</button>
+        <button id="snapshotBtn">📸 Snapshot</button>
+      </div>
+      <div class="nft-banner">🏆 Top speed: ${Math.floor(currentSpeed)} ${speedUnit} | Earn NFTs for speed records!</div>
+    `;
+    videoElement = document.getElementById("cameraFeed");
+    canvasElement = document.getElementById("detectionCanvas");
+    ctx = canvasElement.getContext("2d");
+    startCamera();
+    loadModel().then(() => {
+      if (detectionInterval) clearInterval(detectionInterval);
+      detectionInterval = setInterval(detectObjects, 500);
+    });
+    document.getElementById("mphBtn")?.addEventListener("click", () => { speedUnit = "mph"; updateSpeedDisplay(); });
+    document.getElementById("kmhBtn")?.addEventListener("click", () => { speedUnit = "kmh"; updateSpeedDisplay(); });
+    document.getElementById("voiceCmdBtn")?.addEventListener("click", startVoiceCommand);
+    document.getElementById("nightVisionBtn")?.addEventListener("click", toggleNightVision);
+    document.getElementById("startGpsBtn")?.addEventListener("click", startGPS);
+    document.getElementById("switchCamBtn")?.addEventListener("click", switchCamera);
+    document.getElementById("snapshotBtn")?.addEventListener("click", takeSnapshot);
+  }
+
+  function renderHunt(container) {
+    let logsHtml = huntingLogs.map(l => `<div>🐾 ${l.scat} | ${l.track} | ${l.marking} | ${l.location}</div>`).join('');
+    container.innerHTML = `
+      <div class="hunting-panel">
+        <h3>🏹 Hunters Edition</h3>
+        <p><strong>Predictive tracking active:</strong> AI scanning for movement...</p>
+        <p><strong>Wearable alert (Oracle/RPM):</strong> No large game detected within 50yd.</p>
+        <input type="text" id="scatInput" placeholder="Scat type & freshness (e.g., Deer, 2 days old)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <input type="text" id="trackInput" placeholder="Track analysis (e.g., Hoof, 3 inches)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <input type="text" id="markingInput" placeholder="Marking/rubs (e.g., Antler rub on tree)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <input type="text" id="locationInput" placeholder="Location (GPS coordinates or area)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <button id="logHuntBtn">📝 Log Hunt Observation (+0.01 ETH reward)</button>
+      </div>
+      <div class="card"><h3>Previous Logs</h3>${logsHtml || "No logs yet. Start hunting!"}</div>
+      <div class="nft-banner">🏅 Hunting achievements mint NFTs. Top hunters earn rare badges!</div>
+    `;
+    document.getElementById("logHuntBtn")?.addEventListener("click", () => {
+      let scat = document.getElementById("scatInput").value;
+      let track = document.getElementById("trackInput").value;
+      let marking = document.getElementById("markingInput").value;
+      let location = document.getElementById("locationInput").value;
+      if (scat || track || marking) {
+        addHuntingLog(scat || "unknown", track || "unknown", marking || "none", location || "unknown");
+        renderHunt(container);
+      } else { alert("Fill at least one field."); }
+    });
+  }
+
+  function renderProfile(container) {
+    let nftsHtml = userNFTs.map(n => `<div>${n.name} – ${n.value || "0.1 ETH"}</div>`).join('');
+    let logsHtml = huntingLogs.slice(-3).map(l => `<div>${l.scat} | ${l.track}</div>`).join('');
+    container.innerHTML = `
+      <div class="card" style="text-align:center">
+        <img src="${currentUser?.photoURL || 'https://via.placeholder.com/100'}" style="width:100px; border-radius:50%;">
+        <h3>${currentUser?.displayName || "Guest"}</h3>
+        <p>${currentUser?.email || "Not signed in"}</p>
+        <div class="profile-wallet">
+          <strong>Wallet:</strong> ${userWalletAddress}<br>
+          <strong>Balance:</strong> ${walletBalance.toFixed(2)} ETH
+          <button id="copyWalletBtn">📋 Copy</button>
+        </div>
+        <label>Bio:</label>
+        <textarea id="bioEdit" rows="2" style="width:100%;">${userBio}</textarea>
+        <button id="saveBioBtn">Save Bio</button>
+        <button id="addFundsBtn">➕ Add 1 ETH</button>
+      </div>
+      <div class="card"><h3>🎨 My NFTs</h3>${nftsHtml || "No NFTs yet. Hunt or take snapshots to earn."}<button id="mintDemoNft">✨ Mint Demo NFT</button></div>
+      <div class="card"><h3>🏹 Recent Hunts</h3>${logsHtml || "No hunts logged."}</div>
+    `;
+    document.getElementById("copyWalletBtn")?.addEventListener("click", () => { navigator.clipboard.writeText(userWalletAddress); alert("Copied!"); });
+    document.getElementById("saveBioBtn")?.addEventListener("click", () => { userBio = document.getElementById("bioEdit").value; localStorage.setItem("userBio", userBio); alert("Bio saved."); });
+    document.getElementById("addFundsBtn")?.addEventListener("click", () => { walletBalance += 1; localStorage.setItem("walletBalance", walletBalance); renderProfile(container); });
+    document.getElementById("mintDemoNft")?.addEventListener("click", () => { userNFTs.push({ name: `Demo NFT ${Date.now()}`, value: "0.05 ETH" }); localStorage.setItem("userNFTs", JSON.stringify(userNFTs)); renderProfile(container); });
+  }
+
+  // ==================== Authentication ====================
+  function updateUserWidget() {
+    const widget = document.getElementById('userWidget');
+    if (currentUser) {
+      widget.innerHTML = `<img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" style="width:32px; border-radius:50%;"> <button id="logoutBtn" class="icon-btn" style="font-size:0.8rem;">🚪</button>`;
+      document.getElementById('logoutBtn')?.addEventListener('click', () => { if(auth) auth.signOut(); currentUser = null; render(); });
+    } else {
+      widget.innerHTML = `<button id="googleSignInBtn" class="badge">🔑 Sign in</button>`;
+      document.getElementById('googleSignInBtn')?.addEventListener('click', () => {
+        if (auth) {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          auth.signInWithPopup(provider).then(result => { currentUser = result.user; render(); }).catch(() => mockSignIn());
+        } else { mockSignIn(); }
+      });
+    }
+  }
+  function mockSignIn() { currentUser = { displayName: "Douglas Owens", email: "owensonicinfinity@gmail.com", photoURL: "https://via.placeholder.com/80" }; render(); }
+
+  function isAdmin() {
+    if (!currentUser) return false;
+    const email = (currentUser.email || "").toLowerCase();
+    const name = (currentUser.displayName || "").toLowerCase();
+    return email === "owensonicinfinity@gmail.com" || name.includes("douglas");
+  }
+
+  // ==================== Settings Modal ====================
+  function openSettings() {
+    let modalHtml = `<div id="settingsModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; display:flex; justify-content:center; align-items:center;"><div style="background:#1e293b; border-radius:32px; max-width:500px; width:90%; padding:24px;"><h3>⚙️ Settings</h3><div><label>Neon Color</label><input type="color" id="neonColorPicker" value="${localStorage.getItem('neonColor') || '#00f5c0'}"></div><div><label>Background URL</label><input type="text" id="bgImageUrl" value="${customBgImage}"></div>`;
+    if (isAdmin()) modalHtml += `<div style="margin-top:12px; padding:12px; background:rgba(255,100,0,0.15); border-radius:16px;"><h4>🔐 Admin</h4><label>Gemini API Key</label><input type="password" id="geminiApiKeyInput" value="${geminiApiKey}"><button id="saveAdminSettings">Save</button></div>`;
+    modalHtml += `<button id="closeSettingsBtn" style="margin-top:16px;">Close</button></div></div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('closeSettingsBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.remove());
+    document.getElementById('neonColorPicker')?.addEventListener('change', (e) => { localStorage.setItem('neonColor', e.target.value); document.documentElement.style.setProperty('--neon', e.target.value); });
+    document.getElementById('bgImageUrl')?.addEventListener('change', (e) => { customBgImage = e.target.value; localStorage.setItem('customBgImage', customBgImage); document.body.style.background = customBgImage ? `url('${customBgImage}') center/cover fixed` : "#0a0f1e"; });
+    if (isAdmin()) document.getElementById('saveAdminSettings')?.addEventListener('click', () => { geminiApiKey = document.getElementById('geminiApiKeyInput').value; localStorage.setItem('geminiApiKey', geminiApiKey); alert("Saved."); });
+  }
+
+  // ==================== DaisyAI ====================
+  async function callGemini(prompt) {
+    if (!geminiApiKey) return null;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch(e) { return null; }
+  }
+  async function processAIQuery(query) {
+    const messagesDiv = document.getElementById("aiMessages");
+    messagesDiv.innerHTML += `<div><b>You:</b> ${query}</div>`;
+    let reply = "";
+    if (geminiApiKey) {
+      const geminiReply = await callGemini(query);
+      if (geminiReply) reply = geminiReply;
+      else reply = "Gemini error. Check key in settings.";
+    } else {
+      if (query.toLowerCase().includes("speed")) reply = `Current speed: ${Math.floor(currentSpeed)} ${speedUnit}. Start GPS for real-time tracking.`;
+      else if (query.toLowerCase().includes("hunt")) reply = `You have ${huntingLogs.length} hunting logs. Keep hunting to earn NFTs.`;
+      else if (query.toLowerCase().includes("wallet")) reply = `Wallet: ${userWalletAddress}. Balance: ${walletBalance.toFixed(2)} ETH.`;
+      else reply = "Try 'speed', 'hunt', or 'wallet'.";
+    }
+    messagesDiv.innerHTML += `<div><b>🤖 DaisyAI:</b> ${reply}</div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    speak(reply);
+  }
+  function startVoiceAI() {
+    if (!recognition) { alert("STT not supported"); return; }
+    recognition.start();
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      document.getElementById("aiInput").value = text;
+      processAIQuery(text);
+    };
+  }
+  document.getElementById("voiceInputBtn")?.addEventListener("click", startVoiceAI);
+  document.getElementById("sendAiBtn")?.addEventListener("click", () => {
+    const input = document.getElementById("aiInput");
+    if (input.value.trim()) processAIQuery(input.value);
+    input.value = "";
+  });
+
+  // ==================== Initialization ====================
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedNeon = localStorage.getItem('neonColor');
+    if (savedNeon) document.documentElement.style.setProperty('--neon', savedNeon);
+    customBgImage = localStorage.getItem("customBgImage") || "";
+    if (customBgImage) document.body.style.background = `url('${customBgImage}') center/cover fixed`;
+    const storedUser = localStorage.getItem('daisySpeedUser');
+    if (storedUser) currentUser = JSON.parse(storedUser);
+    render();
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => { currentScreen = btn.dataset.nav; render(); });
+    });
+    document.getElementById('settingsBtn')?.addEventListener('click', openSettings);
+    const aiModal = document.getElementById('aiModal');
+    document.getElementById('floatingAiBtn')?.addEventListener('click', () => { aiModal.style.display = aiModal.style.display === 'flex' ? 'none' : 'flex'; });
+    document.getElementById('closeAiModal')?.addEventListener('click', () => aiModal.style.display = 'none');
+  });
+</script>
+</body>
+  </html>
