@@ -1,0 +1,34 @@
+# Apache server configuration for DaisyOS
+
+# Enable mod_rewrite
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # Remove .html extension from URLs
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^([^\.]+)$ $1.html [NC,L]
+  
+  # Redirect index.html and Index.html to root
+  RewriteCond %{REQUEST_URI} ^/(index|Index)\.html?$
+  RewriteRule ^(index|Index)\.html?$ / [R=301,L]
+  
+  # Allow direct access to files with extensions
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+end</IfModule>
+
+# Enable gzip compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+</IfModule>
+
+# Set cache headers
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html A3600
+  ExpiresByType text/css A86400
+  ExpiresByType application/javascript A86400
+  ExpiresByType image/* A604800
+</IfModule>

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Sitemap: https://github.com/OWENSONICINFINITY-RPM-ORACLE/DAISYOS-DAISYAI-SAYSO
+Disallow: /admin
+Disallow: /*.html$
+Disallow: /.htaccess
