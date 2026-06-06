@@ -180,6 +180,7 @@
       font-size: 0.7rem;
       border-top: 1px solid rgba(0,245,192,0.2);
     }
+    a { color: var(--neon); text-decoration: none; }
     @media (max-width: 640px) {
       .ai-modal { width: 280px; right: 10px; bottom: 140px; }
     }
@@ -333,7 +334,7 @@
 
   function renderHome(container) {
     container.innerHTML = `
-      <div class="disclaimer">⚠️ DISCLAIMER: DaisyOS apps provide tools for tracking, racing, and object detection. You are solely responsible for your actions. We do not encourage illegal street racing, unsafe behavior, or violation of any laws. Use at your own risk. No liability for misuse.</div>
+      <div class="disclaimer">⚠️ DISCLAIMER: DaisyOS apps provide tools for tracking, racing, and object detection. You are solely responsible for your actions. We do not encourage illegal street racing, unsafe behavior, or misuse.</div>
       <div class="nft-banner">🚀 DaisyOS: 5 apps, NFT marketplace, AI assistant. Real telemetry. No simulations. 2% escrow fee.</div>
       <div class="card">
         <h3>Welcome to DaisyOS</h3>
@@ -345,6 +346,7 @@
         <div class="card"><h3>🏎️ DaisyGT</h3><p>Drag racing, 3-beep start, betting escrow, famous tracks</p><a href="daisygt.html" class="badge">Launch →</a></div>
         <div class="card"><h3>🔍 DaisyObjects</h3><p>AI object detection, hunting logs, wearable alerts</p><a href="daisyobjects.html" class="badge">Launch →</a></div>
         <div class="card"><h3>💬 SAYSO</h3><p>Social, lives, NFT trading</p><a href="sayso.html" class="badge">Launch →</a></div>
+        <div class="card"><h3>🕵️ DaisyInvestigation</h3><p>Forensic tools, gov license, thermal imaging</p><a href="daisyinvestigation.html" class="badge">Launch →</a></div>
       </div>
     `;
   }
@@ -399,7 +401,7 @@
         </div>
         <div id="contractOutput" class="profile-wallet" style="display:none; margin-top:12px;"></div>
         <div id="nftGrid" class="apps-grid" style="margin-top:20px;">
-          ${allNFTs.map(nft => `<div class="card" data-cat="${nft.category}"><div style="font-size:3rem;">${nft.image}</div><h4>${nft.name}</h4><p>${nft.price}</p><button class="buyNftBtn">Buy with Escrow (2% fee)</button></div>`).join('')}
+          ${allNFTs.map(nft => `<div class="card" data-cat="${nft.category}"><div style="font-size:3rem;">${nft.image}</div><h4>${nft.name}</h4><p>${nft.price}</p><button class="buyNftBtn">Buy with Escrow</button></div>`).join('')}
         </div>
       </div>
     `;
@@ -424,11 +426,11 @@ contract DaisyOS_NFT is ERC721 {
     function mint(address to, uint256 tokenId) public { _mint(to, tokenId); }
 }`;
       document.getElementById("contractOutput").style.display = "block";
-      document.getElementById("contractOutput").innerHTML = `<strong>DaisyAI Generated Contract:</strong><br><pre style="font-size:10px; overflow-x:auto;">${contract}</pre><button onclick="navigator.clipboard.writeText(\`${contract.replace(/`/g, '\\`')}\`)">Copy Contract</button>`;
+      document.getElementById("contractOutput").innerHTML = `<strong>DaisyAI Generated Contract:</strong><br><pre style="font-size:10px; overflow-x:auto;">${contract}</pre><button onclick="navigator.clipboard.writeText(\`${contract.replace(/`/g, '\\`')}\`); alert('Contract copied!');">📋 Copy Contract</button>`;
     });
     document.getElementById("manualContractBtn")?.addEventListener("click", () => {
       document.getElementById("contractOutput").style.display = "block";
-      document.getElementById("contractOutput").innerHTML = `<textarea id="manualContract" rows="8" style="width:100%; background:#0f172a; color:white; padding:8px;">// Write your ERC-721/ERC-1155 contract here...</textarea><button id="saveManualContract">Save Contract</button>`;
+      document.getElementById("contractOutput").innerHTML = `<textarea id="manualContract" rows="8" style="width:100%; background:#0f172a; color:white; padding:8px;">// Write your ERC-721/ERC-1155 contract here</textarea><button id="saveManualContract">Save Contract</button>`;
       document.getElementById("saveManualContract")?.addEventListener("click", () => {
         alert("Contract saved to your profile. You can deploy later.");
       });
@@ -482,7 +484,7 @@ contract DaisyOS_NFT is ERC721 {
   function updateUserWidget() {
     const widget = document.getElementById('userWidget');
     if (currentUser) {
-      widget.innerHTML = `<img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" style="width:32px; border-radius:50%;"> <span>${currentUser.displayName || currentUser.email}</span> <button id="logoutBtn" class="icon-btn" style="font-size:0.8rem;">🚪</button>`;
+      widget.innerHTML = `<img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" style="width:32px; border-radius:50%;"> <button id="logoutBtn" class="icon-btn" style="font-size:0.8rem;">Logout</button>`;
       document.getElementById('logoutBtn')?.addEventListener('click', () => {
         if(auth) auth.signOut();
         currentUser = null;
@@ -570,4 +572,4 @@ contract DaisyOS_NFT is ERC721 {
   });
 </script>
 </body>
-  </html>
+</html>
