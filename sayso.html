@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>SAYSO – Unified Social Platform by DaisyOS</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0f1e;
+      color: #eef2ff;
+      padding-bottom: 80px;
+    }
+    :root { --neon: #00f5c0; }
+    .container { max-width: 800px; margin: 0 auto; padding: 16px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .badge-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      background: rgba(0,245,192,0.1);
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      border: 1px solid rgba(0,245,192,0.3);
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      color: var(--neon);
+    }
+    .nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(10,15,30,0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(0,245,192,0.3);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.7rem;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .nav-item.active { color: var(--neon); }
+    .nav-icon { font-size: 1.5rem; }
+    .card {
+      background: rgba(15,23,42,0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 24px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(0,245,192,0.2);
+    }
+    .post-header { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--neon); }
+    .nft-banner {
+      background: linear-gradient(135deg, #00f5c0, #0a8f6e);
+      color: #0a0f1e;
+      padding: 12px;
+      border-radius: 20px;
+      text-align: center;
+      margin: 16px 0;
+      font-weight: bold;
+    }
+    button {
+      background: rgba(0,245,192,0.2);
+      border: 1px solid var(--neon);
+      padding: 8px 16px;
+      border-radius: 40px;
+      color: var(--neon);
+      cursor: pointer;
+    }
+    .profile-wallet {
+      font-family: monospace;
+      background: #00000066;
+      padding: 8px;
+      border-radius: 20px;
+      margin: 8px 0;
+    }
+    .disclaimer {
+      background: rgba(255,70,70,0.1);
+      border-left: 4px solid #ff4444;
+      padding: 12px 16px;
+      margin: 20px 0;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+    footer {
+      margin-top: 40px;
+      padding: 20px 0;
+      text-align: center;
+      font-size: 0.7rem;
+      border-top: 1px solid rgba(0,245,192,0.2);
+    }
+    .floating-ai {
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      background: var(--neon);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--neon);
+      z-index: 200;
+      font-size: 28px;
+      border: none;
+      color: #0a0f1e;
+    }
+    .ai-modal {
+      display: none;
+      position: fixed;
+      bottom: 160px;
+      right: 20px;
+      width: 320px;
+      background: #1e293b;
+      border-radius: 24px;
+      border: 2px solid var(--neon);
+      z-index: 201;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ai-header {
+      background: #0f172a;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--neon);
+    }
+    .ai-messages {
+      height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      font-size: 0.85rem;
+    }
+    .ai-input-area {
+      display: flex;
+      padding: 8px;
+      gap: 8px;
+      border-top: 1px solid rgba(0,245,192,0.3);
+    }
+    .ai-input-area input {
+      flex: 1;
+      padding: 8px;
+      border-radius: 40px;
+      border: none;
+      background: #0f172a;
+      color: white;
+    }
+    @media (max-width: 640px) {
+      .ai-modal { width: 280px; right: 10px; bottom: 140px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="appContainer">
+  <div class="header">
+    <h2>💬 SAYSO</h2>
+    <div class="badge-row">
+      <span class="badge">🔗 NFT Marketplace</span>
+      <span class="badge">🎲 2% Escrow Fee</span>
+      <div id="userWidget"></div>
+      <button class="icon-btn" id="settingsBtn">⚙️</button>
+    </div>
+  </div>
+  <div id="screenContent"></div>
+  <footer>
+    <a href="https://owensonicinfinity.netlify.app" target="_blank">OwenSonicInfinity.netlify.app</a> | 
+    <a href="https://owensonicinfinity.github.io" target="_blank">OwenSonicInfinity.github.io</a><br>
+    Cleveland, Ohio 44089 | owensonicinfinity@gmail.com<br>
+    © 2026 Douglas Owens Jr. All rights reserved.
+  </footer>
+</div>
+
+<div class="nav-bar">
+  <button class="nav-item" data-nav="home"><span class="nav-icon">🏠</span><span>Home</span></button>
+  <button class="nav-item" data-nav="feed"><span class="nav-icon">📰</span><span>Feed</span></button>
+  <button class="nav-item" data-nav="lives"><span class="nav-icon">🎥</span><span>Lives</span></button>
+  <button class="nav-item" data-nav="profile"><span class="nav-icon">👤</span><span>Profile</span></button>
+</div>
+
+<button class="floating-ai" id="floatingAiBtn">🤖</button>
+<div id="aiModal" class="ai-modal">
+  <div class="ai-header">
+    <span>🤖 DaisyAI <span class="badge">Autonomous</span></span>
+    <button id="closeAiModal" style="background:none; border:none; color:var(--neon); font-size:1.2rem;">✕</button>
+  </div>
+  <div id="aiMessages" class="ai-messages">
+    <div>👋 Hi, I'm DaisyAI. Ask me about racing groups, NFTs, or your wallet.</div>
+  </div>
+  <div class="ai-input-area">
+    <button id="voiceInputBtn" style="background:none; border:none; font-size:1.2rem;">🎤</button>
+    <input type="text" id="aiInput" placeholder="Type or speak...">
+    <button id="sendAiBtn">Send</button>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDummyKeyForDemoOnly",
+    authDomain: "daisyos-demo.firebaseapp.com",
+    projectId: "daisyos-demo",
+  };
+  let auth;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+  } catch(e) { console.warn("Firebase init failed"); }
+
+  let currentUser = null;
+  let currentScreen = 'home';
+  let geminiApiKey = localStorage.getItem("geminiApiKey") || "";
+  let customBgImage = localStorage.getItem("customBgImage") || "";
+  let walletBalance = parseFloat(localStorage.getItem("walletBalance")) || 5.0;
+  let userNFTs = JSON.parse(localStorage.getItem("userNFTs")) || [];
+  let userBio = localStorage.getItem("userBio") || "SAYSO user. NFT collector.";
+  let userWalletAddress = localStorage.getItem("userWalletAddress") || `0x${Math.random().toString(36).substring(2, 10)}...`;
+
+  let recognition;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+  }
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      let utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+  async function callGemini(prompt) {
+    if (!geminiApiKey) return null;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch(e) { return null; }
+  }
+  async function processAIQuery(query) {
+    const messagesDiv = document.getElementById("aiMessages");
+    messagesDiv.innerHTML += `<div><b>You:</b> ${query}</div>`;
+    let reply = "";
+    if (geminiApiKey) {
+      const geminiReply = await callGemini(query);
+      if (geminiReply) reply = geminiReply;
+      else reply = "Gemini error. Check API key in settings.";
+    } else {
+      if (query.toLowerCase().includes("race")) reply = "Join racing groups in Feed. Bets use 2% escrow fee.";
+      else if (query.toLowerCase().includes("nft")) reply = `You have ${userNFTs.length} NFTs.`;
+      else if (query.toLowerCase().includes("wallet")) reply = `Your wallet: ${userWalletAddress}. Balance: ${walletBalance} ETH.`;
+      else reply = "Try 'race', 'NFT', or 'wallet'.";
+    }
+    messagesDiv.innerHTML += `<div><b>🤖 DaisyAI:</b> ${reply}</div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    speak(reply);
+  }
+  function startVoice() {
+    if (!recognition) { alert("STT not supported"); return; }
+    recognition.start();
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      document.getElementById("aiInput").value = text;
+      processAIQuery(text);
+    };
+  }
+  document.getElementById("voiceInputBtn")?.addEventListener("click", startVoice);
+  document.getElementById("sendAiBtn")?.addEventListener("click", () => {
+    const input = document.getElementById("aiInput");
+    if (input.value.trim()) processAIQuery(input.value);
+    input.value = "";
+  });
+
+  function isAdmin() {
+    if (!currentUser) return false;
+    const email = (currentUser.email || "").toLowerCase();
+    const name = (currentUser.displayName || "").toLowerCase();
+    return email === "owensonicinfinity@gmail.com" || name.includes("douglas");
+  }
+
+  function render() {
+    const container = document.getElementById('screenContent');
+    if (currentScreen === 'home') renderHome(container);
+    else if (currentScreen === 'feed') renderFeed(container);
+    else if (currentScreen === 'lives') renderLives(container);
+    else if (currentScreen === 'profile') renderProfile(container);
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      if(btn.dataset.nav === currentScreen) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    updateUserWidget();
+  }
+
+  function renderHome(container) {
+    container.innerHTML = `
+      <div class="disclaimer">⚠️ DISCLAIMER: You are solely responsible for your actions. 2% escrow fee applies to all bets and NFT sales. No liability for misuse.</div>
+      <div class="nft-banner">🎉 Welcome to SAYSO – Social, Lives, NFT Marketplace. 2% fee keeps the ecosystem alive.</div>
+      <div class="card"><h3>🔥 Trending Now</h3><p>Racing group "Midnight Club" has 1.2 ETH prize pool.</p><button>Join Group</button></div>
+      <div class="card"><h3>📈 Your Stats</h3><p>NFTs: ${userNFTs.length} | Wallet: ${walletBalance.toFixed(2)} ETH</p></div>
+    `;
+  }
+
+  function renderFeed(container) {
+    container.innerHTML = `
+      <div class="nft-banner">📰 Feed – Racing groups, challenges, NFT drops</div>
+      <div class="card"><div class="post-header"><div class="avatar"></div><div><b>RacerX</b> · 2h ago</div></div><p>Just won a race! +0.5 ETH after 2% fee.</p><button>Tip 0.01 ETH</button></div>
+      <div class="card"><div class="post-header"><div class="avatar"></div><div><b>HunterJane</b> · 5h ago</div></div><p>New NFT minted: "12-Point Buck" – check marketplace.</p><button>View NFT</button></div>
+      <div class="card"><h4>🏎️ Racing Groups</h4><p>Open Bracket Challenge. Entry: 0.1 ETH. 2% escrow fee.</p><button>Join & Bet</button></div>
+    `;
+  }
+
+  function renderLives(container) {
+    container.innerHTML = `
+      <div class="nft-banner">🎥 TikTok‑Style Lives – Interactive, tip with ETH, group chat</div>
+      <div class="card"><h3>🔴 LIVE: @SpeedDemon</h3><p>Drag race at Pomona. 847 watching.</p><button>Join Live</button><button>Tip 0.05 ETH</button></div>
+      <div class="card"><h3>🔴 LIVE: @HunterPro</h3><p>Tracking a 10-point buck. 234 watching.</p><button>Join Live</button><button>Tip 0.02 ETH</button></div>
+      <div class="card"><h3>Start Your Own Live</h3><button id="startLiveBtn">Go Live (requires 0.01 ETH deposit)</button></div>
+    `;
+    document.getElementById("startLiveBtn")?.addEventListener("click", () => alert("Live streaming will start. Camera access required."));
+  }
+
+  function renderProfile(container) {
+    let nftsHtml = userNFTs.map(n => `<div>${n.name} – ${n.value || "0.1 ETH"}</div>`).join('');
+    container.innerHTML = `
+      <div class="card" style="text-align:center">
+        <img src="${currentUser?.photoURL || 'https://via.placeholder.com/100'}" style="width:100px; border-radius:50%;">
+        <h3>${currentUser?.displayName || "Guest"}</h3>
+        <p>${currentUser?.email || "Not signed in"}</p>
+        <div class="profile-wallet">
+          <strong>Wallet:</strong> ${userWalletAddress}<br>
+          <strong>Balance:</strong> ${walletBalance.toFixed(2)} ETH
+          <button id="copyWalletBtn">📋 Copy</button>
+        </div>
+        <label>Bio:</label>
+        <textarea id="bioEdit" rows="2" style="width:100%;">${userBio}</textarea>
+        <button id="saveBioBtn">Save Bio</button>
+        <button id="addFundsBtn">➕ Add 1 ETH</button>
+      </div>
+      <div class="card"><h3>🎨 My NFTs</h3>${nftsHtml || "No NFTs yet."}<button id="mintDemoNft">✨ Mint Demo NFT</button></div>
+    `;
+    document.getElementById("copyWalletBtn")?.addEventListener("click", () => { navigator.clipboard.writeText(userWalletAddress); alert("Copied!"); });
+    document.getElementById("saveBioBtn")?.addEventListener("click", () => { userBio = document.getElementById("bioEdit").value; localStorage.setItem("userBio", userBio); alert("Bio saved."); });
+    document.getElementById("addFundsBtn")?.addEventListener("click", () => { walletBalance += 1; localStorage.setItem("walletBalance", walletBalance); renderProfile(container); });
+    document.getElementById("mintDemoNft")?.addEventListener("click", () => { userNFTs.push({ name: `Demo NFT ${Date.now()}`, value: "0.05 ETH" }); localStorage.setItem("userNFTs", JSON.stringify(userNFTs)); renderProfile(container); });
+  }
+
+  function updateUserWidget() {
+    const widget = document.getElementById('userWidget');
+    if (currentUser) {
+      widget.innerHTML = `<img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" style="width:32px; border-radius:50%;"> <button id="logoutBtn" class="icon-btn" style="font-size:0.8rem;">🚪</button>`;
+      document.getElementById('logoutBtn')?.addEventListener('click', () => { if(auth) auth.signOut(); currentUser = null; render(); });
+    } else {
+      widget.innerHTML = `<button id="googleSignInBtn" class="badge">🔑 Sign in</button>`;
+      document.getElementById('googleSignInBtn')?.addEventListener('click', () => {
+        if (auth) {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          auth.signInWithPopup(provider).then(result => { currentUser = result.user; render(); }).catch(() => mockSignIn());
+        } else { mockSignIn(); }
+      });
+    }
+  }
+  function mockSignIn() { currentUser = { displayName: "Douglas Owens", email: "owensonicinfinity@gmail.com", photoURL: "https://via.placeholder.com/80" }; render(); }
+
+  function openSettings() {
+    let modalHtml = `<div id="settingsModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; display:flex; justify-content:center; align-items:center;"><div style="background:#1e293b; border-radius:32px; max-width:500px; width:90%; padding:24px;"><h3>⚙️ Settings</h3><div><label>Neon Color</label><input type="color" id="neonColorPicker" value="${localStorage.getItem('neonColor') || '#00f5c0'}"></div><div><label>Background URL</label><input type="text" id="bgImageUrl" value="${customBgImage}"></div>`;
+    if (isAdmin()) modalHtml += `<div><h4>Admin</h4><label>Gemini Key</label><input type="password" id="geminiApiKeyInput" value="${geminiApiKey}"><button id="saveAdminSettings">Save</button></div>`;
+    modalHtml += `<button id="closeSettingsBtn">Close</button></div></div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('closeSettingsBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.remove());
+    document.getElementById('neonColorPicker')?.addEventListener('change', (e) => { localStorage.setItem('neonColor', e.target.value); document.documentElement.style.setProperty('--neon', e.target.value); });
+    document.getElementById('bgImageUrl')?.addEventListener('change', (e) => { customBgImage = e.target.value; localStorage.setItem('customBgImage', customBgImage); document.body.style.background = customBgImage ? `url('${customBgImage}') center/cover fixed` : "#0a0f1e"; });
+    if (isAdmin()) document.getElementById('saveAdminSettings')?.addEventListener('click', () => { geminiApiKey = document.getElementById('geminiApiKeyInput').value; localStorage.setItem('geminiApiKey', geminiApiKey); alert("Saved."); });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedNeon = localStorage.getItem('neonColor');
+    if (savedNeon) document.documentElement.style.setProperty('--neon', savedNeon);
+    customBgImage = localStorage.getItem("customBgImage") || "";
+    if (customBgImage) document.body.style.background = `url('${customBgImage}') center/cover fixed`;
+    const storedUser = localStorage.getItem('saysoUser');
+    if (storedUser) currentUser = JSON.parse(storedUser);
+    render();
+    document.querySelectorAll('.nav-item').forEach(btn => { btn.addEventListener('click', () => { currentScreen = btn.dataset.nav; render(); }); });
+    document.getElementById('settingsBtn')?.addEventListener('click', openSettings);
+    const aiModal = document.getElementById('aiModal');
+    document.getElementById('floatingAiBtn')?.addEventListener('click', () => { aiModal.style.display = aiModal.style.display === 'flex' ? 'none' : 'flex'; });
+    document.getElementById('closeAiModal')?.addEventListener('click', () => aiModal.style.display = 'none');
+  });
+</script>
+</body>
+  </html>
