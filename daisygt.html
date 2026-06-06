@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>DaisyGT – Real Racing Telemetry | DaisyOS</title>
+  <!-- Firebase Auth (Google Sign-In) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0f1e;
+      color: #eef2ff;
+      overflow-x: hidden;
+      padding-bottom: 80px;
+    }
+    :root { --neon: #00f5c0; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .badge-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      background: rgba(0,245,192,0.1);
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      border: 1px solid rgba(0,245,192,0.3);
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      color: var(--neon);
+      transition: 0.2s;
+    }
+    .icon-btn:hover { background: rgba(0,245,192,0.2); }
+    .nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(10,15,30,0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(0,245,192,0.3);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.7rem;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .nav-item.active { color: var(--neon); }
+    .nav-icon { font-size: 1.5rem; }
+    .card {
+      background: rgba(15,23,42,0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 24px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(0,245,192,0.2);
+    }
+    .speedo {
+      font-size: 3rem;
+      font-weight: 800;
+      font-family: monospace;
+    }
+    .nft-banner {
+      background: linear-gradient(135deg, #00f5c0, #0a8f6e);
+      color: #0a0f1e;
+      padding: 12px;
+      border-radius: 20px;
+      text-align: center;
+      margin: 16px 0;
+      font-weight: bold;
+    }
+    button {
+      background: rgba(0,245,192,0.2);
+      border: 1px solid var(--neon);
+      padding: 8px 16px;
+      border-radius: 40px;
+      color: var(--neon);
+      cursor: pointer;
+      margin: 4px;
+    }
+    .race-result {
+      background: #00000066;
+      border-radius: 24px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .profile-wallet {
+      font-family: monospace;
+      background: #00000066;
+      padding: 8px;
+      border-radius: 20px;
+      margin: 8px 0;
+    }
+    .disclaimer {
+      background: rgba(255,70,70,0.1);
+      border-left: 4px solid #ff4444;
+      padding: 12px 16px;
+      margin: 20px 0;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+    footer {
+      margin-top: 40px;
+      padding: 20px 0;
+      text-align: center;
+      font-size: 0.7rem;
+      border-top: 1px solid rgba(0,245,192,0.2);
+    }
+    .floating-ai {
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      background: var(--neon);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--neon);
+      z-index: 200;
+      font-size: 28px;
+      border: none;
+      color: #0a0f1e;
+    }
+    .ai-modal {
+      display: none;
+      position: fixed;
+      bottom: 160px;
+      right: 20px;
+      width: 320px;
+      background: #1e293b;
+      border-radius: 24px;
+      border: 2px solid var(--neon);
+      z-index: 201;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ai-header {
+      background: #0f172a;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--neon);
+    }
+    .ai-messages {
+      height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      font-size: 0.85rem;
+    }
+    .ai-input-area {
+      display: flex;
+      padding: 8px;
+      gap: 8px;
+      border-top: 1px solid rgba(0,245,192,0.3);
+    }
+    .ai-input-area input {
+      flex: 1;
+      padding: 8px;
+      border-radius: 40px;
+      border: none;
+      background: #0f172a;
+      color: white;
+    }
+    .countdown-tree {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .light {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: #333;
+      transition: 0.1s;
+    }
+    .light.red.active { background: red; box-shadow: 0 0 20px red; }
+    .light.yellow.active { background: yellow; box-shadow: 0 0 20px yellow; }
+    .light.green.active { background: lime; box-shadow: 0 0 20px lime; }
+    @media (max-width: 640px) {
+      .speedo { font-size: 2rem; }
+      .ai-modal { width: 280px; right: 10px; bottom: 140px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="appContainer">
+  <div class="header">
+    <h2>🏎️ DaisyGT</h2>
+    <div class="badge-row">
+      <span class="badge">🏁 Real GPS</span>
+      <span class="badge">💰 2% Escrow</span>
+      <span class="badge">🗺️ 20+ Tracks</span>
+      <div id="userWidget"></div>
+      <button class="icon-btn" id="settingsBtn">⚙️</button>
+    </div>
+  </div>
+  <div id="screenContent"></div>
+  <footer>
+    <a href="https://owensonicinfinity.netlify.app" target="_blank">OwenSonicInfinity.netlify.app</a> | 
+    <a href="https://owensonicinfinity.github.io" target="_blank">OwenSonicInfinity.github.io</a><br>
+    Cleveland, Ohio 44089 | owensonicinfinity@gmail.com<br>
+    © 2026 Douglas Owens Jr. All rights reserved.
+  </footer>
+</div>
+
+<div class="nav-bar">
+  <button class="nav-item" data-nav="home"><span class="nav-icon">🏠</span><span>Home</span></button>
+  <button class="nav-item" data-nav="race"><span class="nav-icon">🏁</span><span>Race</span></button>
+  <button class="nav-item" data-nav="tracks"><span class="nav-icon">🗺️</span><span>Tracks</span></button>
+  <button class="nav-item" data-nav="garage"><span class="nav-icon">🚗</span><span>Garage</span></button>
+  <button class="nav-item" data-nav="profile"><span class="nav-icon">👤</span><span>Profile</span></button>
+</div>
+
+<button class="floating-ai" id="floatingAiBtn">🤖</button>
+<div id="aiModal" class="ai-modal">
+  <div class="ai-header">
+    <span>🤖 DaisyAI <span class="badge">Autonomous</span></span>
+    <button id="closeAiModal" style="background:none; border:none; color:var(--neon); font-size:1.2rem;">✕</button>
+  </div>
+  <div id="aiMessages" class="ai-messages">
+    <div>👋 I'm DaisyAI. Ask me about racing, tracks, or your wallet.</div>
+  </div>
+  <div class="ai-input-area">
+    <button id="voiceInputBtn" style="background:none; border:none; font-size:1.2rem;">🎤</button>
+    <input type="text" id="aiInput" placeholder="Type or speak...">
+    <button id="sendAiBtn">Send</button>
+  </div>
+</div>
+
+<script>
+  // ==================== Firebase & Global State ====================
+  const firebaseConfig = {
+    apiKey: "AIzaSyDummyKeyForDemoOnly",
+    authDomain: "daisyos-demo.firebaseapp.com",
+    projectId: "daisyos-demo",
+  };
+  let auth;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+  } catch(e) { console.warn("Firebase init failed, using mock auth"); }
+
+  let currentUser = null;
+  let currentScreen = 'home';
+  let geminiApiKey = localStorage.getItem("geminiApiKey") || "";
+  let customBgImage = localStorage.getItem("customBgImage") || "";
+  let walletBalance = parseFloat(localStorage.getItem("walletBalance")) || 5.0;
+  let userNFTs = JSON.parse(localStorage.getItem("userNFTs")) || [];
+  let userBio = localStorage.getItem("userBio") || "Racer. NFT collector.";
+  let userWalletAddress = localStorage.getItem("userWalletAddress") || `0x${Math.random().toString(36).substring(2, 10)}...`;
+  let userVehicles = JSON.parse(localStorage.getItem("userVehicles")) || [];
+  let raceHistory = JSON.parse(localStorage.getItem("raceHistory")) || [];
+  let activeBet = null;
+
+  // Real telemetry
+  let currentSpeed = 0;
+  let currentGforce = { x: 0, y: 0, z: 0 };
+  let gpsWatchId = null;
+  let lastPosition = null;
+  let lastTimestamp = 0;
+
+  // Famous tracks database (Top 20)
+  const famousTracks = [
+    { name: "Indianapolis Motor Speedway", type: "Road/Drag", location: "Indiana, USA", lat: 39.795, lng: -86.234 },
+    { name: "Daytona International Speedway", type: "Road", location: "Florida, USA", lat: 29.185, lng: -81.069 },
+    { name: "Santa Pod Raceway", type: "Drag", location: "UK", lat: 52.237, lng: -0.676 },
+    { name: "Nürburgring Nordschleife", type: "Road", location: "Germany", lat: 50.334, lng: 6.947 },
+    { name: "Suzuka Circuit", type: "Road", location: "Japan", lat: 34.843, lng: 136.541 },
+    { name: "Pomona Raceway", type: "Drag", location: "California, USA", lat: 34.053, lng: -117.796 },
+    { name: "Autodromo Nazionale Monza", type: "Road", location: "Italy", lat: 45.621, lng: 9.281 },
+    { name: "Silverstone Circuit", type: "Road", location: "UK", lat: 52.078, lng: -1.016 },
+    { name: "Bandimere Speedway", type: "Drag", location: "Colorado, USA", lat: 39.675, lng: -105.206 },
+    { name: "Mount Panorama (Bathurst)", type: "Road", location: "Australia", lat: -33.446, lng: 149.555 },
+    { name: "Laguna Seca", type: "Road", location: "California, USA", lat: 36.584, lng: -121.753 },
+    { name: "Circuit de Spa-Francorchamps", type: "Road", location: "Belgium", lat: 50.437, lng: 5.971 },
+    { name: "Gainesville Raceway", type: "Drag", location: "Florida, USA", lat: 29.657, lng: -82.511 },
+    { name: "Texas Motor Speedway", type: "Oval", location: "Texas, USA", lat: 33.037, lng: -97.283 },
+    { name: "Auto Club Speedway", type: "Oval", location: "California, USA", lat: 34.091, lng: -117.502 },
+    { name: "Road Atlanta", type: "Road", location: "Georgia, USA", lat: 34.147, lng: -83.814 },
+    { name: "Lime Rock Park", type: "Road", location: "Connecticut, USA", lat: 41.928, lng: -73.388 },
+    { name: "Pacific Raceways", type: "Drag/Road", location: "Washington, USA", lat: 47.307, lng: -122.199 },
+    { name: "Moscow Raceway", type: "Road", location: "Russia", lat: 55.813, lng: 36.944 },
+    { name: "Dubai Autodrome", type: "Road", location: "UAE", lat: 25.034, lng: 55.423 }
+  ];
+
+  // ==================== Real GPS & Telemetry ====================
+  function startGPS() {
+    if (!navigator.geolocation) { alert("GPS not supported"); return; }
+    if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now();
+        if (lastPosition) {
+          const dt = (now - lastTimestamp) / 1000;
+          if (dt > 0.1) {
+            const distance = haversineDistance(lastPosition.coords, pos.coords);
+            const speedMs = distance / dt;
+            currentSpeed = speedMs * 2.23694;
+            currentSpeed = Math.min(250, Math.max(0, currentSpeed));
+            updateTelemetryDisplay();
+          }
+        }
+        lastPosition = pos;
+        lastTimestamp = now;
+      },
+      (err) => console.warn("GPS error", err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
+  }
+
+  function haversineDistance(coords1, coords2) {
+    const R = 6371000;
+    const lat1 = coords1.latitude * Math.PI/180;
+    const lat2 = coords2.latitude * Math.PI/180;
+    const dlat = (coords2.latitude - coords1.latitude) * Math.PI/180;
+    const dlon = (coords2.longitude - coords1.longitude) * Math.PI/180;
+    const a = Math.sin(dlat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function startAccelerometer() {
+    if (window.DeviceMotionEvent) {
+      window.addEventListener("devicemotion", (e) => {
+        let acc = e.accelerationIncludingGravity;
+        if (acc) {
+          currentGforce = {
+            x: ((acc.x || 0) / 9.81).toFixed(2),
+            y: ((acc.y || 0) / 9.81).toFixed(2),
+            z: ((acc.z || 0) / 9.81).toFixed(2)
+          };
+          updateTelemetryDisplay();
+        }
+      });
+    }
+  }
+
+  function updateTelemetryDisplay() {
+    const speedEl = document.getElementById("realSpeed");
+    const gforceEl = document.getElementById("realGforce");
+    if (speedEl) speedEl.innerText = Math.floor(currentSpeed);
+    if (gforceEl) gforceEl.innerText = currentGforce.x;
+  }
+
+  // ==================== 3-Beep Start with AI Anticipation ====================
+  function beepCountdown(callback, onAnticipate) {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(freq, duration) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = freq;
+      gain.gain.value = 0.5;
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+      osc.stop(audioCtx.currentTime + duration);
+    }
+    // Simulate AI anticipating beep intervals
+    beep(880, 0.1);
+    setTimeout(() => beep(880, 0.1), 1000);
+    setTimeout(() => beep(880, 0.1), 2000);
+    setTimeout(() => {
+      if (onAnticipate) onAnticipate();
+      beep(440, 0.5);
+      callback();
+    }, 3000);
+  }
+
+  function treeCountdown(callback, onAnticipate) {
+    const container = document.createElement('div');
+    container.className = 'countdown-tree';
+    container.innerHTML = `<div class="light red" id="redLight"></div><div class="light yellow" id="yellowLight"></div><div class="light green" id="greenLight"></div>`;
+    document.body.appendChild(container);
+    let red = document.getElementById('redLight');
+    let yellow = document.getElementById('yellowLight');
+    let green = document.getElementById('greenLight');
+    red.classList.add('active');
+    setTimeout(() => { red.classList.remove('active'); yellow.classList.add('active'); }, 1000);
+    setTimeout(() => { yellow.classList.remove('active'); green.classList.add('active'); if(onAnticipate) onAnticipate(); }, 2000);
+    setTimeout(() => { container.remove(); callback(); }, 2500);
+  }
+
+  function aiCountdown(callback, onAnticipate) {
+    const utterance = new SpeechSynthesisUtterance("Three... two... one... GO!");
+    utterance.onend = () => callback();
+    window.speechSynthesis.speak(utterance);
+    if (onAnticipate) setTimeout(() => onAnticipate(), 2500);
+  }
+
+  function startRaceWithAnticipation(vehicle, startMethod, hypeCallback) {
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const onAnticipate = () => {
+        if (hypeCallback) hypeCallback();
+      };
+      const finish = () => {
+        const launchTime = performance.now();
+        const reactionMs = launchTime - startTime;
+        let et = estimateET(vehicle.hp);
+        let mph = currentSpeed > 0 ? currentSpeed : 60;
+        const result = { vehicle: vehicle.name, et: parseFloat(et), mph: Math.floor(mph), reaction: reactionMs };
+        resolve(result);
+      };
+      if (startMethod === 'tree') treeCountdown(finish, onAnticipate);
+      else if (startMethod === 'beep') beepCountdown(finish, onAnticipate);
+      else aiCountdown(finish, onAnticipate);
+    });
+  }
+
+  function estimateET(hp) {
+    let weight = 3500;
+    let et = 1320 / (Math.sqrt(hp/weight) * 20);
+    return Math.min(20, Math.max(9, et)).toFixed(2);
+  }
+
+  // ==================== Vehicle Management ($1 fee) ====================
+  function addVehicle(name, year, hp) {
+    if (walletBalance >= 1) {
+      walletBalance -= 1;
+      localStorage.setItem("walletBalance", walletBalance);
+      userVehicles.push({ name, year, hp, et: estimateET(hp) });
+      localStorage.setItem("userVehicles", JSON.stringify(userVehicles));
+      return true;
+    } else {
+      alert("Insufficient funds. Need 1 ETH to add vehicle.");
+      return false;
+    }
+  }
+
+  // ==================== Betting Escrow (2% fee) ====================
+  function placeBet(amount, targetVehicleId) {
+    if (amount > walletBalance) return "Insufficient balance";
+    let fee = amount * 0.02;
+    let betAmount = amount - fee;
+    walletBalance -= amount;
+    activeBet = { amount: betAmount, fee, targetVehicleId };
+    localStorage.setItem("walletBalance", walletBalance);
+    return `Bet ${amount} ETH placed on ${targetVehicleId}. 2% fee (${fee.toFixed(4)} ETH) deducted.`;
+  }
+
+  function resolveBet(winnerVehicleId) {
+    if (activeBet && activeBet.targetVehicleId === winnerVehicleId) {
+      let winAmount = activeBet.amount * 1.9;
+      walletBalance += winAmount;
+      localStorage.setItem("walletBalance", walletBalance);
+      let msg = `You won ${winAmount.toFixed(2)} ETH! (${activeBet.fee.toFixed(4)} ETH fee retained)`;
+      activeBet = null;
+      return msg;
+    } else if (activeBet) {
+      activeBet = null;
+      return "You lost your bet.";
+    }
+    return "No active bet.";
+  }
+
+  // ==================== UI Rendering ====================
+  function render() {
+    const container = document.getElementById('screenContent');
+    if (currentScreen === 'home') renderHome(container);
+    else if (currentScreen === 'race') renderRace(container);
+    else if (currentScreen === 'tracks') renderTracks(container);
+    else if (currentScreen === 'garage') renderGarage(container);
+    else if (currentScreen === 'profile') renderProfile(container);
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      if(btn.dataset.nav === currentScreen) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    updateUserWidget();
+  }
+
+  function renderHome(container) {
+    container.innerHTML = `
+      <div class="disclaimer">⚠️ DISCLAIMER: You are solely responsible for your actions. 2% escrow fee applies to all bets. No liability for misuse.</div>
+      <div class="nft-banner">🏆 DaisyGT – Real racing telemetry. 3-beep start with AI anticipation. Famous tracks worldwide. 2% escrow fee.</div>
+      <div class="card">
+        <h3>📡 Live Telemetry</h3>
+        <p>Speed: <span id="realSpeed">0</span> mph</p>
+        <p>G-Force (X): <span id="realGforce">0.00</span> g</p>
+        <p>G-Force (Y): ${currentGforce.y} g | (Z): ${currentGforce.z} g</p>
+        <button id="startGpsBtn">📍 Start GPS</button>
+        <button id="startAccelBtn">📳 Start Accelerometer</button>
+      </div>
+      <div class="card">
+        <h3>🏁 Recent Races</h3>
+        <div id="recentRaces">${raceHistory.slice(0,3).map(r => `<div>${r.vehicle} – ${r.et}s @ ${r.mph}mph (reaction: ${r.reaction}ms)</div>`).join('') || "No races yet."}</div>
+      </div>
+    `;
+    document.getElementById("startGpsBtn")?.addEventListener("click", () => { startGPS(); alert("GPS tracking started."); });
+    document.getElementById("startAccelBtn")?.addEventListener("click", () => { startAccelerometer(); alert("Accelerometer active."); });
+  }
+
+  function renderRace(container) {
+    let selectedVehicleId = userVehicles[0]?.name || "";
+    container.innerHTML = `
+      <div class="card">
+        <h3>🏎️ Start a Race</h3>
+        <label>Select Vehicle:</label>
+        <select id="vehicleSelect">${userVehicles.map(v => `<option value="${v.name}">${v.name} (${v.hp} HP, est ${v.et}s)</option>`).join('')}</select><br>
+        <label>Distance:</label>
+        <select id="distanceSelect">
+          <option value="1/8">⅛ mile</option>
+          <option value="1/4" selected>¼ mile</option>
+          <option value="1/2">½ mile</option>
+          <option value="1">1 mile</option>
+          <option value="custom">Custom track</option>
+        </select><br>
+        <label>Start Method:</label>
+        <select id="startMethod">
+          <option value="tree">Traffic Light Tree</option>
+          <option value="beep">3-Beep Sequence (AI Anticipates)</option>
+          <option value="ai">AI Voice Countdown</option>
+        </select><br>
+        <button id="startRaceBtn">🏁 START RACE</button>
+        <div id="raceResultDiv" class="race-result" style="display:none;"></div>
+      </div>
+      <div class="card">
+        <h3>💰 Betting Escrow (2% fee)</h3>
+        <p>Your balance: ${walletBalance.toFixed(2)} ETH</p>
+        <input type="number" id="betAmount" placeholder="ETH amount" step="0.1">
+        <button id="placeBetBtn">Place Bet on Selected Vehicle</button>
+        <div id="betStatus"></div>
+      </div>
+      <div class="nft-banner">🎥 Race recording coming soon. Winners earn NFTs!</div>
+    `;
+    const startBtn = document.getElementById("startRaceBtn");
+    startBtn?.addEventListener("click", async () => {
+      const vehicleName = document.getElementById("vehicleSelect").value;
+      const vehicle = userVehicles.find(v => v.name === vehicleName);
+      if (!vehicle) { alert("Select a vehicle"); return; }
+      const method = document.getElementById("startMethod").value;
+      startBtn.disabled = true;
+      const hypeCallback = () => {
+        speak("GO GO GO! Push it!");
+      };
+      const result = await startRaceWithAnticipation(vehicle, method, hypeCallback);
+      raceHistory.unshift(result);
+      localStorage.setItem("raceHistory", JSON.stringify(raceHistory));
+      let betMsg = resolveBet(vehicle.name);
+      const resultDiv = document.getElementById("raceResultDiv");
+      resultDiv.style.display = "block";
+      resultDiv.innerHTML = `<h4>🏆 Race Result</h4><p>${result.vehicle}: ${result.et}s @ ${result.mph} mph</p><p>Reaction time: ${result.reaction.toFixed(0)} ms</p><p>${betMsg}</p>`;
+      startBtn.disabled = false;
+    });
+    document.getElementById("placeBetBtn")?.addEventListener("click", () => {
+      let amount = parseFloat(document.getElementById("betAmount").value);
+      let vehicle = document.getElementById("vehicleSelect").value;
+      if (isNaN(amount) || amount <= 0) { alert("Enter valid amount"); return; }
+      let msg = placeBet(amount, vehicle);
+      document.getElementById("betStatus").innerText = msg;
+    });
+  }
+
+  function renderTracks(container) {
+    container.innerHTML = `
+      <div class="card">
+        <h3>🗺️ Famous Tracks Database</h3>
+        <input type="text" id="trackSearch" placeholder="Search by name or location..." style="width:100%; padding:10px; border-radius:40px; margin-bottom:16px;">
+        <input type="text" id="locationSearch" placeholder="Enter your city/state to find nearby tracks..." style="width:100%; padding:10px; border-radius:40px; margin-bottom:16px;">
+        <button id="findNearbyBtn">📍 Find Tracks Near Me</button>
+        <div id="tracksList" style="max-height:400px; overflow-y:auto;">
+          ${famousTracks.map(t => `<div class="badge" style="display:block; margin:8px 0; text-align:left;"><strong>${t.name}</strong> - ${t.type} (${t.location})<br><a href="https://www.google.com/maps/search/?api=1&query=${t.lat},${t.lng}" target="_blank" style="color:var(--neon);">📱 View on Google Maps</a></div>`).join('')}
+        </div>
+      </div>
+    `;
+    document.getElementById("trackSearch")?.addEventListener("input", (e) => {
+      const term = e.target.value.toLowerCase();
+      const items = document.querySelectorAll("#tracksList .badge");
+      items.forEach(item => {
+        const text = item.innerText.toLowerCase();
+        item.style.display = text.includes(term) ? "block" : "none";
+      });
+    });
+    document.getElementById("findNearbyBtn")?.addEventListener("click", () => {
+      if (!navigator.geolocation) { alert("GPS not supported"); return; }
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const userLat = pos.coords.latitude;
+        const userLng = pos.coords.longitude;
+        let nearby = famousTracks.map(t => {
+          const dist = haversineDistance({ latitude: userLat, longitude: userLng }, { latitude: t.lat, longitude: t.lng }) / 1609;
+          return { ...t, dist: dist.toFixed(1) };
+        }).filter(t => t.dist < 100).sort((a,b) => a.dist - b.dist).slice(0,5);
+        if (nearby.length === 0) { alert("No tracks within 100 miles."); return; }
+        alert(`Nearest tracks:\n${nearby.map(t => `${t.name} - ${t.dist} miles`).join('\n')}`);
+      }, () => alert("Could not get your location"));
+    });
+  }
+
+  function renderGarage(container) {
+    container.innerHTML = `
+      <div class="card">
+        <h3>🚗 My Garage</h3>
+        <div id="vehiclesList">${userVehicles.map(v => `<div>${v.name} (${v.year}) – ${v.hp} HP – est ${v.et}s</div>`).join('') || "No vehicles. Add one below."}</div>
+        <button id="addVehicleBtn">➕ Add Vehicle ($1 ETH)</button>
+        <div id="addVehiclePanel" style="display:none; margin-top:12px;">
+          <input type="text" id="newVehName" placeholder="Name"><br>
+          <input type="text" id="newVehYear" placeholder="Year"><br>
+          <input type="number" id="newVehHp" placeholder="HP"><br>
+          <button id="confirmAddBtn">Confirm ($1)</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("addVehicleBtn")?.addEventListener("click", () => {
+      document.getElementById("addVehiclePanel").style.display = "block";
+    });
+    document.getElementById("confirmAddBtn")?.addEventListener("click", () => {
+      let name = document.getElementById("newVehName").value;
+      let year = document.getElementById("newVehYear").value;
+      let hp = parseInt(document.getElementById("newVehHp").value);
+      if (name && year && hp) {
+        if (addVehicle(name, year, hp)) {
+          alert("Vehicle added. $1 ETH deducted.");
+          renderGarage(container);
+        }
+      } else alert("Fill all fields");
+    });
+  }
+
+  function renderProfile(container) {
+    let nftsHtml = userNFTs.map(n => `<div>${n.name} – ${n.value || "0.1 ETH"}</div>`).join('');
+    let racesHtml = raceHistory.slice(0,5).map(r => `<div>${r.vehicle} – ${r.et}s @ ${r.mph}mph</div>`).join('');
+    container.innerHTML = `
+      <div class="card" style="text-align:center">
+        <img src="${currentUser?.photoURL || 'https://via.placeholder.com/100'}" style="width:100px; border-radius:50%;">
+        <h3>${currentUser?.displayName || "Guest"}</h3>
+        <p>${currentUser?.email || "Not signed in"}</p>
+        <div class="profile-wallet">
+          <strong>Wallet:</strong> ${userWalletAddress}<br>
+          <strong>Balance:</strong> ${walletBalance.toFixed(2)} ETH
+          <button id="copyWalletBtn">📋 Copy</button>
+        </div>
+        <label>Bio:</label>
+        <textarea id="bioEdit" rows="2" style="width:100%;">${userBio}</textarea>
+        <button id="saveBioBtn">Save Bio</button>
+        <button id="addFundsBtn">➕ Add 1 ETH</button>
+      </div>
+      <div class="card"><h3>🎨 My NFTs</h3>${nftsHtml || "No NFTs yet."}<button id="mintDemoNft">✨ Mint Demo NFT</button></div>
+      <div class="card"><h3>🏁 Race History</h3>${racesHtml || "No races yet."}</div>
+    `;
+    document.getElementById("copyWalletBtn")?.addEventListener("click", () => { navigator.clipboard.writeText(userWalletAddress); alert("Copied!"); });
+    document.getElementById("saveBioBtn")?.addEventListener("click", () => { userBio = document.getElementById("bioEdit").value; localStorage.setItem("userBio", userBio); alert("Bio saved."); });
+    document.getElementById("addFundsBtn")?.addEventListener("click", () => { walletBalance += 1; localStorage.setItem("walletBalance", walletBalance); renderProfile(container); });
+    document.getElementById("mintDemoNft")?.addEventListener("click", () => { userNFTs.push({ name: `Race NFT ${Date.now()}`, value: "0.1 ETH" }); localStorage.setItem("userNFTs", JSON.stringify(userNFTs)); renderProfile(container); });
+  }
+
+  // ==================== Authentication ====================
+  function updateUserWidget() {
+    const widget = document.getElementById('userWidget');
+    if (currentUser) {
+      widget.innerHTML = `<img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" style="width:32px; border-radius:50%;"> <button id="logoutBtn" class="icon-btn" style="font-size:0.8rem;">🚪</button>`;
+      document.getElementById('logoutBtn')?.addEventListener('click', () => { if(auth) auth.signOut(); currentUser = null; render(); });
+    } else {
+      widget.innerHTML = `<button id="googleSignInBtn" class="badge">🔑 Sign in</button>`;
+      document.getElementById('googleSignInBtn')?.addEventListener('click', () => {
+        if (auth) {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          auth.signInWithPopup(provider).then(result => { currentUser = result.user; render(); }).catch(() => mockSignIn());
+        } else { mockSignIn(); }
+      });
+    }
+  }
+  function mockSignIn() { currentUser = { displayName: "Douglas Owens", email: "owensonicinfinity@gmail.com", photoURL: "https://via.placeholder.com/80" }; render(); }
+  function isAdmin() {
+    if (!currentUser) return false;
+    const email = (currentUser.email || "").toLowerCase();
+    const name = (currentUser.displayName || "").toLowerCase();
+    return email === "owensonicinfinity@gmail.com" || name.includes("douglas");
+  }
+
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  // ==================== Settings Modal ====================
+  function openSettings() {
+    let modalHtml = `<div id="settingsModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; display:flex; justify-content:center; align-items:center;"><div style="background:#1e293b; border-radius:32px; max-width:500px; width:90%; padding:24px;"><h3>⚙️ Settings</h3><div><label>Neon Color</label><input type="color" id="neonColorPicker" value="${localStorage.getItem('neonColor') || '#00f5c0'}"></div><div><label>Background URL</label><input type="text" id="bgImageUrl" value="${customBgImage}"></div>`;
+    if (isAdmin()) modalHtml += `<div style="margin-top:12px; padding:12px; background:rgba(255,100,0,0.15); border-radius:16px;"><h4>🔐 Admin</h4><label>Gemini API Key</label><input type="password" id="geminiApiKeyInput" value="${geminiApiKey}"><button id="saveAdminSettings">Save</button></div>`;
+    modalHtml += `<button id="closeSettingsBtn" style="margin-top:16px;">Close</button></div></div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('closeSettingsBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.remove());
+    document.getElementById('neonColorPicker')?.addEventListener('change', (e) => { localStorage.setItem('neonColor', e.target.value); document.documentElement.style.setProperty('--neon', e.target.value); });
+    document.getElementById('bgImageUrl')?.addEventListener('change', (e) => { customBgImage = e.target.value; localStorage.setItem('customBgImage', customBgImage); document.body.style.background = customBgImage ? `url('${customBgImage}') center/cover fixed` : "#0a0f1e"; });
+    if (isAdmin()) document.getElementById('saveAdminSettings')?.addEventListener('click', () => { geminiApiKey = document.getElementById('geminiApiKeyInput').value; localStorage.setItem('geminiApiKey', geminiApiKey); alert("Saved."); });
+  }
+
+  // ==================== DaisyAI ====================
+  let recognition;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+  }
+  async function callGemini(prompt) {
+    if (!geminiApiKey) return null;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch(e) { return null; }
+  }
+  async function processAIQuery(query) {
+    const messagesDiv = document.getElementById("aiMessages");
+    messagesDiv.innerHTML += `<div><b>You:</b> ${query}</div>`;
+    let reply = "";
+    if (geminiApiKey) {
+      const geminiReply = await callGemini(query);
+      if (geminiReply) reply = geminiReply;
+      else reply = "Gemini error. Check key in settings.";
+    } else {
+      if (query.toLowerCase().includes("race")) reply = `You have ${userVehicles.length} vehicles. Start a race with 3-beep start. Bets have 2% fee.`;
+      else if (query.toLowerCase().includes("track")) reply = `There are ${famousTracks.length} famous tracks. Use Tracks tab to find nearby ones.`;
+      else if (query.toLowerCase().includes("wallet")) reply = `Wallet: ${userWalletAddress}. Balance: ${walletBalance.toFixed(2)} ETH.`;
+      else reply = "Try 'race', 'tracks', or 'wallet'.";
+    }
+    messagesDiv.innerHTML += `<div><b>🤖 DaisyAI:</b> ${reply}</div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    speak(reply);
+  }
+  function startVoiceAI() {
+    if (!recognition) { alert("STT not supported"); return; }
+    recognition.start();
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      document.getElementById("aiInput").value = text;
+      processAIQuery(text);
+    };
+  }
+  document.getElementById("voiceInputBtn")?.addEventListener("click", startVoiceAI);
+  document.getElementById("sendAiBtn")?.addEventListener("click", () => {
+    const input = document.getElementById("aiInput");
+    if (input.value.trim()) processAIQuery(input.value);
+    input.value = "";
+  });
+
+  // ==================== Initialization ====================
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedNeon = localStorage.getItem('neonColor');
+    if (savedNeon) document.documentElement.style.setProperty('--neon', savedNeon);
+    customBgImage = localStorage.getItem("customBgImage") || "";
+    if (customBgImage) document.body.style.background = `url('${customBgImage}') center/cover fixed`;
+    const storedUser = localStorage.getItem('daisyGTUser');
+    if (storedUser) currentUser = JSON.parse(storedUser);
+    render();
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => { currentScreen = btn.dataset.nav; render(); });
+    });
+    document.getElementById('settingsBtn')?.addEventListener('click', openSettings);
+    const aiModal = document.getElementById('aiModal');
+    document.getElementById('floatingAiBtn')?.addEventListener('click', () => { aiModal.style.display = aiModal.style.display === 'flex' ? 'none' : 'flex'; });
+    document.getElementById('closeAiModal')?.addEventListener('click', () => aiModal.style.display = 'none');
+  });
+</script>
+</body>
+  </html>
