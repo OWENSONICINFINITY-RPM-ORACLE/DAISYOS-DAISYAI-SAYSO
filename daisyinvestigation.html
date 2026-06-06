@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>DaisyInvestigation – Military-Grade Forensics | DaisyOS</title>
+  <!-- Firebase Auth (Google Sign-In) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <!-- TensorFlow.js for footprint/object analysis -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;600;700;800&display=swap" rel="stylesheet">
+  <!-- jsPDF for report generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0f1e;
+      color: #eef2ff;
+      overflow-x: hidden;
+      padding-bottom: 80px;
+    }
+    :root { --neon: #00f5c0; --gold: #ffd700; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #0a0f1e, #0f172a);
+      padding: 16px;
+      border-radius: 32px;
+      border: 1px solid var(--neon);
+    }
+    .badge-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      background: rgba(0,245,192,0.1);
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      border: 1px solid rgba(0,245,192,0.3);
+    }
+    .gov-badge {
+      background: rgba(255,215,0,0.2);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      color: var(--neon);
+      transition: 0.2s;
+    }
+    .nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(10,15,30,0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(0,245,192,0.3);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.7rem;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .nav-item.active { color: var(--neon); }
+    .nav-icon { font-size: 1.5rem; }
+    .card {
+      background: rgba(15,23,42,0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 24px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(0,245,192,0.2);
+    }
+    .forensics-card {
+      border-left: 4px solid #ff4444;
+    }
+    .step-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border-left: 4px solid var(--neon);
+      margin: 12px 0;
+      padding: 16px;
+      border-radius: 20px;
+    }
+    button {
+      background: rgba(0,245,192,0.2);
+      border: 1px solid var(--neon);
+      padding: 8px 16px;
+      border-radius: 40px;
+      color: var(--neon);
+      cursor: pointer;
+      margin: 4px;
+    }
+    .btn-gov {
+      background: rgba(255,215,0,0.2);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+    .license-gate {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.95);
+      backdrop-filter: blur(12px);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .license-box {
+      background: #1e293b;
+      border: 2px solid var(--gold);
+      border-radius: 32px;
+      padding: 32px;
+      max-width: 500px;
+      text-align: center;
+    }
+    .evidence-item {
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 16px;
+      margin: 8px 0;
+      border-left: 3px solid var(--neon);
+    }
+    .chain-link {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px;
+      border-bottom: 1px solid rgba(0,245,192,0.3);
+    }
+    .profile-wallet {
+      font-family: monospace;
+      background: #00000066;
+      padding: 8px;
+      border-radius: 20px;
+      margin: 8px 0;
+    }
+    .disclaimer {
+      background: rgba(255,70,70,0.1);
+      border-left: 4px solid #ff4444;
+      padding: 12px 16px;
+      margin: 20px 0;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+    footer {
+      margin-top: 40px;
+      padding: 20px 0;
+      text-align: center;
+      font-size: 0.7rem;
+      border-top: 1px solid rgba(0,245,192,0.2);
+    }
+    .floating-ai {
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      background: var(--neon);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--neon);
+      z-index: 200;
+      font-size: 28px;
+      border: none;
+      color: #0a0f1e;
+    }
+    .ai-modal {
+      display: none;
+      position: fixed;
+      bottom: 160px;
+      right: 20px;
+      width: 320px;
+      background: #1e293b;
+      border-radius: 24px;
+      border: 2px solid var(--neon);
+      z-index: 201;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .thermal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, #ff000022, #ff880022, #ffff0022);
+      pointer-events: none;
+      mix-blend-mode: overlay;
+    }
+    @media (max-width: 640px) {
+      .ai-modal { width: 280px; right: 10px; bottom: 140px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="appContainer">
+  <div class="header">
+    <h2>🕵️ DAISY<span style="color:var(--gold)">INVESTIGATION</span></h2>
+    <div class="badge-row">
+      <span class="badge gov-badge">⚖️ GOV LICENSE REQUIRED</span>
+      <span class="badge">🔬 Forensic Grade</span>
+      <span class="badge">🌡️ Thermal Imaging</span>
+      <span class="badge">⛓️ Chain of Custody</span>
+      <div id="userWidget"></div>
+      <button class="icon-btn" id="settingsBtn">⚙️</button>
+    </div>
+  </div>
+  <div id="screenContent"></div>
+  <footer>
+    <a href="https://owensonicinfinity.netlify.app" target="_blank">OwenSonicInfinity.netlify.app</a> | 
+    <a href="https://owensonicinfinity.github.io" target="_blank">OwenSonicInfinity.github.io</a><br>
+    Cleveland, Ohio 44089 | owensonicinfinity@gmail.com<br>
+    © 2026 Douglas Owens Jr. All rights reserved. | Military-Grade Forensics
+  </footer>
+</div>
+
+<div class="nav-bar">
+  <button class="nav-item" data-nav="dashboard"><span class="nav-icon">📊</span><span>Dashboard</span></button>
+  <button class="nav-item" data-nav="investigate"><span class="nav-icon">🔬</span><span>Investigate</span></button>
+  <button class="nav-item" data-nav="evidence"><span class="nav-icon">⛓️</span><span>Evidence</span></button>
+  <button class="nav-item" data-nav="reports"><span class="nav-icon">📄</span><span>Reports</span></button>
+  <button class="nav-item" data-nav="profile"><span class="nav-icon">👤</span><span>Profile</span></button>
+</div>
+
+<button class="floating-ai" id="floatingAiBtn">🤖</button>
+<div id="aiModal" class="ai-modal">
+  <div class="ai-header">
+    <span>🤖 DaisyAI <span class="badge">Forensic Assistant</span></span>
+    <button id="closeAiModal" style="background:none; border:none; color:var(--neon); font-size:1.2rem;">✕</button>
+  </div>
+  <div id="aiMessages" class="ai-messages">
+    <div>👮 I'm DaisyAI Forensic. Ask me about investigation procedures, evidence handling, or case law.</div>
+  </div>
+  <div class="ai-input-area">
+    <button id="voiceInputBtn" style="background:none; border:none; font-size:1.2rem;">🎤</button>
+    <input type="text" id="aiInput" placeholder="Type or speak...">
+    <button id="sendAiBtn">Send</button>
+  </div>
+</div>
+
+<script>
+  // ==================== Firebase & Global State ====================
+  const firebaseConfig = {
+    apiKey: "AIzaSyDummyKeyForDemoOnly",
+    authDomain: "daisyos-demo.firebaseapp.com",
+    projectId: "daisyos-demo",
+  };
+  let auth;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+  } catch(e) { console.warn("Firebase init failed"); }
+
+  let currentUser = null;
+  let currentScreen = 'dashboard';
+  let geminiApiKey = localStorage.getItem("geminiApiKey") || "";
+  let customBgImage = localStorage.getItem("customBgImage") || "";
+  
+  // Gov license check
+  let govLicenseValid = false;
+  let govLicenseExpiry = localStorage.getItem("govLicenseExpiry");
+  if (govLicenseExpiry && new Date(govLicenseExpiry) > new Date()) {
+    govLicenseValid = true;
+  }
+  
+  // Investigation state
+  let activeCase = JSON.parse(localStorage.getItem("activeCase")) || {
+    id: null,
+    type: null,
+    status: 'initial',
+    evidence: [],
+    chainOfCustody: [],
+    witnessStatements: [],
+    suspectProfiles: [],
+    createdAt: null
+  };
+  
+  let investigationPhases = [
+    { phase: "Initial Response", completed: false, steps: ["Secure scene", "Identify witnesses", "Call backup"] },
+    { phase: "Scene Assessment", completed: false, steps: ["Photograph scene", "Identify entry/exit", "Mark evidence locations"] },
+    { phase: "Evidence Collection", completed: false, steps: ["Collect physical evidence", "Bag and tag", "Log in chain of custody"] },
+    { phase: "Witness Interviews", completed: false, steps: ["Record statements", "Get contact info", "Corroborate stories"] },
+    { phase: "Suspect Questioning", completed: false, steps: ["Miranda rights", "Record interview", "Document alibis"] },
+    { phase: "Forensic Analysis", completed: false, steps: ["Lab submission", "Run tests", "Document findings"] },
+    { phase: "Follow-up Investigation", completed: false, steps: ["Additional leads", "Surveillance review", "Expert consultation"] },
+    { phase: "Case Closure & Report", completed: false, steps: ["Final report", "Evidence disposition", "Case archived"] }
+  ];
+  
+  let footprintAnalysis = null;
+  let tireAnalysis = null;
+  let thermalActive = false;
+  let videoStream = null;
+  
+  // Admin detection
+  function isAdmin() {
+    if (!currentUser) return false;
+    const email = (currentUser.email || "").toLowerCase();
+    const name = (currentUser.displayName || "").toLowerCase();
+    return email === "owensonicinfinity@gmail.com" || name.includes("douglas");
+  }
+  
+  // ==================== License Gate ====================
+  function showLicenseGate() {
+    const gate = document.createElement('div');
+    gate.className = 'license-gate';
+    gate.id = 'licenseGate';
+    gate.innerHTML = `
+      <div class="license-box">
+        <h2 style="color:var(--gold);">⚖️ GOVERNMENT LICENSE REQUIRED</h2>
+        <p>DaisyInvestigation is restricted to law enforcement and government agencies.</p>
+        <p style="margin:16px 0;">Annual License: <strong>$9,999/year</strong></p>
+        <input type="text" id="licenseKey" placeholder="Enter Government License Key" style="width:100%; padding:12px; border-radius:40px; margin:16px 0;">
+        <button id="verifyLicenseBtn" class="btn-gov">Verify License</button>
+        <p style="margin-top:16px; font-size:0.7rem;">Demo key: <strong>DAISY-GOV-2026</strong></p>
+        <button id="closeGateBtn" style="margin-top:16px; background:none;">Exit</button>
+      </div>
+    `;
+    document.body.appendChild(gate);
+    document.getElementById('verifyLicenseBtn')?.addEventListener('click', () => {
+      const key = document.getElementById('licenseKey').value;
+      if (key === 'DAISY-GOV-2026' || (isAdmin() && key.length > 0)) {
+        govLicenseValid = true;
+        const expiry = new Date();
+        expiry.setFullYear(expiry.getFullYear() + 1);
+        localStorage.setItem("govLicenseExpiry", expiry.toISOString());
+        localStorage.setItem("govLicenseKey", key);
+        gate.remove();
+        render();
+        alert("License verified. Welcome, Officer.");
+      } else {
+        alert("Invalid license key. Contact DaisyOS Government Sales.");
+      }
+    });
+    document.getElementById('closeGateBtn')?.addEventListener('click', () => {
+      window.location.href = "index.html";
+    });
+  }
+  
+  // ==================== Chain of Custody ====================
+  function addToChain(itemName, action, officer) {
+    const entry = {
+      id: Date.now(),
+      itemName,
+      action,
+      officer: officer || currentUser?.displayName || "Unknown Officer",
+      timestamp: new Date().toISOString(),
+      hash: btoa(`${itemName}${action}${Date.now()}${Math.random()}`)
+    };
+    activeCase.chainOfCustody.push(entry);
+    localStorage.setItem("activeCase", JSON.stringify(activeCase));
+    return entry;
+  }
+  
+  function addEvidence(evidence) {
+    evidence.id = Date.now();
+    evidence.collectedBy = currentUser?.displayName || "Unknown";
+    evidence.timestamp = new Date().toISOString();
+    activeCase.evidence.push(evidence);
+    addToChain(evidence.name, "Collected", evidence.collectedBy);
+    localStorage.setItem("activeCase", JSON.stringify(activeCase));
+  }
+  
+  // ==================== AI Investigation Director ====================
+  function getNextStep() {
+    for (let i = 0; i < investigationPhases.length; i++) {
+      if (!investigationPhases[i].completed) {
+        return { phaseIndex: i, phase: investigationPhases[i].phase, steps: investigationPhases[i].steps };
+      }
+    }
+    return null;
+  }
+  
+  function completePhase(phaseIndex) {
+    investigationPhases[phaseIndex].completed = true;
+    localStorage.setItem("investigationPhases", JSON.stringify(investigationPhases));
+    if (phaseIndex + 1 < investigationPhases.length) {
+      speak(`Phase ${investigationPhases[phaseIndex].phase} complete. Proceed to ${investigationPhases[phaseIndex + 1].phase}.`);
+    } else {
+      speak("Case investigation complete. Generate final report.");
+    }
+    render();
+  }
+  
+  // ==================== Footprint & Tire Analysis ====================
+  function analyzeFootprint(type, size, pattern) {
+    footprintAnalysis = {
+      type,
+      size,
+      pattern,
+      estimatedWeight: estimateWeightFromFootprint(size, type),
+      estimatedHeight: estimateHeightFromFootprint(size),
+      timestamp: new Date().toISOString()
+    };
+    localStorage.setItem("footprintAnalysis", JSON.stringify(footprintAnalysis));
+    return footprintAnalysis;
+  }
+  
+  function estimateWeightFromFootprint(size, type) {
+    if (type === "human") return Math.floor(size * 3.5) + 100;
+    if (type === "deer") return Math.floor(size * 8);
+    return Math.floor(size * 5);
+  }
+  
+  function estimateHeightFromFootprint(size) {
+    return Math.floor(size * 6.5);
+  }
+  
+  function analyzeTire(treadWidth, pattern, vehicleType) {
+    tireAnalysis = {
+      treadWidth,
+      pattern,
+      vehicleType,
+      estimatedSpeed: estimateSpeedFromTire(pattern),
+      timestamp: new Date().toISOString()
+    };
+    localStorage.setItem("tireAnalysis", JSON.stringify(tireAnalysis));
+    return tireAnalysis;
+  }
+  
+  function estimateSpeedFromTire(pattern) {
+    // Simplified - real analysis would use skid marks
+    if (pattern.includes("aggressive")) return "High speed (80+ mph)";
+    if (pattern.includes("normal")) return "Normal speed (35-55 mph)";
+    return "Unable to determine";
+  }
+  
+  // ==================== Thermal Imaging Simulation ====================
+  async function startThermalCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+      videoStream = stream;
+      const video = document.getElementById("thermalVideo");
+      if (video) {
+        video.srcObject = stream;
+        video.style.display = "block";
+        // Add thermal overlay
+        let overlay = document.getElementById("thermalOverlay");
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = "thermalOverlay";
+          overlay.className = "thermal-overlay";
+          video.parentElement.appendChild(overlay);
+        }
+        overlay.style.display = "block";
+      }
+      thermalActive = true;
+      alert("Thermal imaging active. Heat signatures will be highlighted.");
+    } catch(e) {
+      alert("Camera access denied for thermal mode.");
+    }
+  }
+  
+  function stopThermalCamera() {
+    if (videoStream) {
+      videoStream.getTracks().forEach(track => track.stop());
+      videoStream = null;
+    }
+    const overlay = document.getElementById("thermalOverlay");
+    if (overlay) overlay.style.display = "none";
+    thermalActive = false;
+  }
+  
+  // ==================== Report Generation (PDF) ====================
+  async function generateReport() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("DaisyInvestigation - Case Report", 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Case ID: ${activeCase.id || "N/A"}`, 20, 40);
+    doc.text(`Case Type: ${activeCase.type || "N/A"}`, 20, 50);
+    doc.text(`Status: ${activeCase.status}`, 20, 60);
+    doc.text(`Created: ${activeCase.createdAt || new Date().toISOString()}`, 20, 70);
+    doc.text(`Lead Investigator: ${currentUser?.displayName || "Unknown"}`, 20, 80);
+    
+    let y = 100;
+    doc.text("Evidence Collected:", 20, y);
+    y += 10;
+    activeCase.evidence.forEach((e, i) => {
+      doc.text(`${i+1}. ${e.name} - ${e.type} (${e.location || "unknown"})`, 25, y);
+      y += 8;
+    });
+    
+    y += 10;
+    doc.text("Chain of Custody:", 20, y);
+    y += 10;
+    activeCase.chainOfCustody.slice(-5).forEach((c, i) => {
+      doc.text(`${i+1}. ${c.itemName} - ${c.action} by ${c.officer} at ${new Date(c.timestamp).toLocaleString()}`, 25, y);
+      y += 8;
+      if (y > 270) { doc.addPage(); y = 20; }
+    });
+    
+    doc.save(`Case_${activeCase.id || Date.now()}_Report.pdf`);
+  }
+  
+  // ==================== UI Rendering ====================
+  function render() {
+    if (!govLicenseValid) {
+      showLicenseGate();
+      return;
+    }
+    
+    const container = document.getElementById('screenContent');
+    if (currentScreen === 'dashboard') renderDashboard(container);
+    else if (currentScreen === 'investigate') renderInvestigate(container);
+    else if (currentScreen === 'evidence') renderEvidence(container);
+    else if (currentScreen === 'reports') renderReports(container);
+    else if (currentScreen === 'profile') renderProfile(container);
+    
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      if(btn.dataset.nav === currentScreen) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    updateUserWidget();
+  }
+  
+  function renderDashboard(container) {
+    const nextStep = getNextStep();
+    const evidenceCount = activeCase.evidence.length;
+    const chainCount = activeCase.chainOfCustody.length;
+    const completedPhases = investigationPhases.filter(p => p.completed).length;
+    
+    container.innerHTML = `
+      <div class="disclaimer">⚠️ FOR OFFICIAL USE ONLY. Chain of custody and evidence handling must follow department protocols.</div>
+      <div class="card forensics-card">
+        <h3>📊 Investigation Dashboard</h3>
+        <p><strong>Active Case:</strong> ${activeCase.id ? `#${activeCase.id}` : "No active case"}</p>
+        <p><strong>Case Type:</strong> ${activeCase.type || "Not set"}</p>
+        <p><strong>Status:</strong> ${activeCase.status || "Initial"}</p>
+        <p><strong>Phases Complete:</strong> ${completedPhases}/8</p>
+        <p><strong>Evidence Items:</strong> ${evidenceCount}</p>
+        <p><strong>Chain of Custody Entries:</strong> ${chainCount}</p>
+        <button id="newCaseBtn">➕ New Case</button>
+      </div>
+      <div class="card">
+        <h3>🤖 AI Investigation Director</h3>
+        ${nextStep ? `
+          <div class="step-card">
+            <h4>Next Phase: ${nextStep.phase}</h4>
+            <p>Action Items:</p>
+            <ul style="margin-left:20px;">
+              ${nextStep.steps.map(s => `<li>${s}</li>`).join('')}
+            </ul>
+            <button id="completePhaseBtn">✓ Mark Phase Complete</button>
+          </div>
+        ` : '<p>🎉 All phases complete! Generate final report.</p>'}
+      </div>
+      <div class="nft-banner">🏛️ Military-grade chain of custody. All evidence entries are SHA-256 hashed and timestamped.</div>
+    `;
+    
+    document.getElementById("newCaseBtn")?.addEventListener("click", () => {
+      const caseType = prompt("Enter case type (Homicide, Robbery, Assault, Theft, Fraud, Missing Person, Hit-and-Run, Drug Crime, Other):", "Homicide");
+      if (caseType) {
+        activeCase = {
+          id: Math.floor(Math.random() * 999999),
+          type: caseType,
+          status: 'Open',
+          evidence: [],
+          chainOfCustody: [],
+          witnessStatements: [],
+          suspectProfiles: [],
+          createdAt: new Date().toISOString()
+        };
+        investigationPhases.forEach(p => p.completed = false);
+        localStorage.setItem("activeCase", JSON.stringify(activeCase));
+        localStorage.setItem("investigationPhases", JSON.stringify(investigationPhases));
+        render();
+        speak(`New ${caseType} case opened. Case number ${activeCase.id}.`);
+      }
+    });
+    
+    document.getElementById("completePhaseBtn")?.addEventListener("click", () => {
+      if (nextStep) {
+        completePhase(nextStep.phaseIndex);
+      }
+    });
+  }
+  
+  function renderInvestigate(container) {
+    container.innerHTML = `
+      <div class="card">
+        <h3>🔬 Forensic Tools</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:12px;">
+          <button id="footprintBtn">👣 Footprint Analysis</button>
+          <button id="tireBtn"> Tire Track Analysis</button>
+          <button id="thermalBtn">🌡️ Thermal Imaging</button>
+          <button id="stopThermalBtn">⏹️ Stop Thermal</button>
+        </div>
+        <div id="footprintPanel" style="display:none; margin-top:16px;">
+          <h4>Footprint Analysis</h4>
+          <select id="footType"><option>human</option><option>deer</option><option>bear</option><option>dog</option></select>
+          <input type="number" id="footSize" placeholder="Size (inches)">
+          <input type="text" id="footPattern" placeholder="Pattern description">
+          <button id="analyzeFootBtn">Analyze</button>
+          <div id="footResult"></div>
+        </div>
+        <div id="tirePanel" style="display:none; margin-top:16px;">
+          <h4>Tire Track Analysis</h4>
+          <input type="text" id="treadWidth" placeholder="Tread width (inches)">
+          <input type="text" id="tirePattern" placeholder="Pattern (aggressive/normal/snow)">
+          <input type="text" id="vehicleType" placeholder="Vehicle type estimate">
+          <button id="analyzeTireBtn">Analyze</button>
+          <div id="tireResult"></div>
+        </div>
+        <div id="thermalPanel" style="display:none; margin-top:16px;">
+          <div style="position:relative; border-radius:24px; overflow:hidden;">
+            <video id="thermalVideo" autoplay playsinline style="width:100%; border-radius:24px;"></video>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>📝 Suspect Profile</h3>
+        <input type="text" id="suspectName" placeholder="Suspect name" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <input type="text" id="suspectDesc" placeholder="Description / notes" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <button id="addSuspectBtn">Add to Case</button>
+        <div id="suspectList">${activeCase.suspectProfiles.map(s => `<div class="evidence-item">${s.name}: ${s.desc}</div>`).join('') || "No suspects added."}</div>
+      </div>
+    `;
+    
+    let footPanel = document.getElementById("footprintPanel");
+    let tirePanel = document.getElementById("tirePanel");
+    let thermalPanel = document.getElementById("thermalPanel");
+    
+    document.getElementById("footprintBtn")?.addEventListener("click", () => {
+      footPanel.style.display = footPanel.style.display === "none" ? "block" : "none";
+      tirePanel.style.display = "none";
+      thermalPanel.style.display = "none";
+    });
+    document.getElementById("tireBtn")?.addEventListener("click", () => {
+      tirePanel.style.display = tirePanel.style.display === "none" ? "block" : "none";
+      footPanel.style.display = "none";
+      thermalPanel.style.display = "none";
+    });
+    document.getElementById("thermalBtn")?.addEventListener("click", () => {
+      thermalPanel.style.display = thermalPanel.style.display === "none" ? "block" : "none";
+      footPanel.style.display = "none";
+      tirePanel.style.display = "none";
+      startThermalCamera();
+    });
+    document.getElementById("stopThermalBtn")?.addEventListener("click", stopThermalCamera);
+    
+    document.getElementById("analyzeFootBtn")?.addEventListener("click", () => {
+      const type = document.getElementById("footType").value;
+      const size = parseFloat(document.getElementById("footSize").value);
+      const pattern = document.getElementById("footPattern").value;
+      if (size) {
+        const result = analyzeFootprint(type, size, pattern);
+        document.getElementById("footResult").innerHTML = `<div class="evidence-item">Estimated weight: ${result.estimatedWeight} lbs<br>Estimated height: ${result.estimatedHeight} inches</div>`;
+        addEvidence({ name: `Footprint - ${type}`, type: "Footprint", location: "Scene", details: result });
+      }
+    });
+    
+    document.getElementById("analyzeTireBtn")?.addEventListener("click", () => {
+      const width = document.getElementById("treadWidth").value;
+      const pattern = document.getElementById("tirePattern").value;
+      const vehicle = document.getElementById("vehicleType").value;
+      if (width) {
+        const result = analyzeTire(width, pattern, vehicle);
+        document.getElementById("tireResult").innerHTML = `<div class="evidence-item">Estimated speed: ${result.estimatedSpeed}</div>`;
+        addEvidence({ name: `Tire Track - ${vehicle}`, type: "Tire Track", location: "Scene", details: result });
+      }
+    });
+    
+    document.getElementById("addSuspectBtn")?.addEventListener("click", () => {
+      const name = document.getElementById("suspectName").value;
+      const desc = document.getElementById("suspectDesc").value;
+      if (name) {
+        activeCase.suspectProfiles.push({ name, desc, addedBy: currentUser?.displayName, timestamp: new Date().toISOString() });
+        localStorage.setItem("activeCase", JSON.stringify(activeCase));
+        renderInvestigate(container);
+      }
+    });
+  }
+  
+  function renderEvidence(container) {
+    container.innerHTML = `
+      <div class="card">
+        <h3>⛓️ Chain of Custody</h3>
+        <div id="chainList">${activeCase.chainOfCustody.slice().reverse().map(c => `
+          <div class="chain-link">
+            <span>📦 ${c.itemName}</span>
+            <span>${c.action}</span>
+            <span>👮 ${c.officer}</span>
+            <span>${new Date(c.timestamp).toLocaleString()}</span>
+            <span class="badge">${c.hash.slice(0,8)}</span>
+          </div>
+        `).join('') || "No chain of custody entries."}</div>
+        <button id="addEvidenceBtn">➕ Add Evidence Manually</button>
+      </div>
+      <div class="card">
+        <h3>🔬 Evidence Collected</h3>
+        <div id="evidenceList">${activeCase.evidence.map(e => `
+          <div class="evidence-item">
+            <strong>${e.name}</strong> - ${e.type}<br>
+            Location: ${e.location || "Unknown"}<br>
+            Collected: ${new Date(e.timestamp).toLocaleString()}<br>
+            By: ${e.collectedBy}
+          </div>
+        `).join('') || "No evidence collected."}</div>
+      </div>
+    `;
+    
+    document.getElementById("addEvidenceBtn")?.addEventListener("click", () => {
+      const name = prompt("Evidence name:");
+      const type = prompt("Evidence type (weapon, DNA, photo, etc.):");
+      const location = prompt("Location found:");
+      if (name) {
+        addEvidence({ name, type, location });
+        renderEvidence(container);
+      }
+    });
+  }
+  
+  function renderReports(container) {
+    container.innerHTML = `
+      <div class="card">
+        <h3>📄 Case Reports</h3>
+        <p><strong>Case #${activeCase.id || "N/A"}</strong></p>
+        <p>Type: ${activeCase.type || "N/A"} | Status: ${activeCase.status || "Open"}</p>
+        <p>Evidence: ${activeCase.evidence.length} items</p>
+        <p>Chain of Custody: ${activeCase.chainOfCustody.length} entries</p>
+        <p>Suspects: ${activeCase.suspectProfiles.length}</p>
+        <button id="generateReportBtn">📑 Generate PDF Report</button>
+        <button id="closeCaseBtn">🔒 Close Case & Archive</button>
+      </div>
+      <div class="card">
+        <h3>📋 Witness Statements</h3>
+        <textarea id="witnessStatement" rows="3" placeholder="Enter witness statement..." style="width:100%; margin:8px 0; padding:8px; border-radius:20px;"></textarea>
+        <input type="text" id="witnessName" placeholder="Witness name" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <button id="addStatementBtn">Add Statement</button>
+        <div id="statementsList">${activeCase.witnessStatements.map(s => `<div class="evidence-item">${s.name}: ${s.statement}</div>`).join('') || "No statements."}</div>
+      </div>
+    `;
+    
+    document.getElementById("generateReportBtn")?.addEventListener("click", generateReport);
+    document.getElementById("closeCaseBtn")?.addEventListener("click", () => {
+      if (confirm("Close this case? It will be archived.")) {
+        activeCase.status = "Closed";
+        activeCase.closedAt = new Date().toISOString();
+        localStorage.setItem("activeCase", JSON.stringify(activeCase));
+        render();
+        alert("Case closed. Archived.");
+      }
+    });
+    document.getElementById("addStatementBtn")?.addEventListener("click", () => {
+      const statement = document.getElementById("witnessStatement").value;
+      const name = document.getElementById("witnessName").value;
+      if (statement && name) {
+        activeCase.witnessStatements.push({ name, statement, timestamp: new Date().toISOString() });
+        localStorage.setItem("activeCase", JSON.stringify(activeCase));
+        renderReports(container);
+      } else {
+        alert("Enter both name and statement.");
+      }
+    });
+  }
+  
+  function renderProfile(container) {
+    container.innerHTML = `
+      <div class="card" style="text-align:center">
+        <img src="${currentUser?.photoURL || 'https://via.placeholder.com/100'}" style="width:100px; border-radius:50%;">
+        <h3>${currentUser?.displayName || "Officer"}</h3>
+        <p>${currentUser?.email || "Not signed in"}</p>
+        <div class="profile-wallet">
+          <strong>Badge ID:</strong> ${currentUser?.uid?.slice(0,8) || "GOV-2026"}<br>
+          <strong>Agency:</strong> ${localStorage.getItem("agency") || "Not specified"}
+        </div>
+        <label>Agency Name:</label>
+        <input type="text" id="agencyInput" value="${localStorage.getItem("agency") || ""}" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <button id="saveAgencyBtn">Save Agency</button>
+      </div>
+      <div class="card">
+        <h3>⚖️ License Information</h3>
+        <p>License Type: Government Annual</p>
+        <p>Expires: ${new Date(govLicenseExpiry).toLocaleDateString() || "N/A"}</p>
+        <p>Status: <span style="color:var(--gold);">ACTIVE</span></p>
+      </div>
+    `;
+    document.getElementById("saveAgencyBtn")?.addEventListener("click", () => {
+      const agency = document.getElementById("agencyInput").value;
+      localStorage.setItem("agency", agency);
+      alert("Agency saved.");
+    });
+  }
+  
+  // ==================== Authentication ====================
+  function updateUserWidget() {
+    const widget = document.getElementById('userWidget');
+    if (currentUser) {
+      widget.innerHTML = `<img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" style="width:32px; border-radius:50%;"> <button id="logoutBtn" class="icon-btn" style="font-size:0.8rem;">🚪</button>`;
+      document.getElementById('logoutBtn')?.addEventListener('click', () => { if(auth) auth.signOut(); currentUser = null; render(); });
+    } else {
+      widget.innerHTML = `<button id="googleSignInBtn" class="badge gov-badge">🔑 Officer Sign In</button>`;
+      document.getElementById('googleSignInBtn')?.addEventListener('click', () => {
+        if (auth) {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          auth.signInWithPopup(provider).then(result => { currentUser = result.user; render(); }).catch(() => mockSignIn());
+        } else { mockSignIn(); }
+      });
+    }
+  }
+  function mockSignIn() { currentUser = { displayName: "Chief Douglas Owens", email: "owensonicinfinity@gmail.com", photoURL: "https://via.placeholder.com/80", uid: "GOV-001" }; render(); }
+  
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+  
+  // ==================== Settings Modal ====================
+  function openSettings() {
+    let modalHtml = `<div id="settingsModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; display:flex; justify-content:center; align-items:center;"><div style="background:#1e293b; border-radius:32px; max-width:500px; width:90%; padding:24px;"><h3>⚙️ Settings</h3><div><label>Neon Color</label><input type="color" id="neonColorPicker" value="${localStorage.getItem('neonColor') || '#00f5c0'}"></div>`;
+    if (isAdmin()) modalHtml += `<div style="margin-top:12px; padding:12px; background:rgba(255,100,0,0.15); border-radius:16px;"><h4>🔐 Admin</h4><label>Gemini API Key</label><input type="password" id="geminiApiKeyInput" value="${geminiApiKey}"><button id="saveAdminSettings">Save</button></div>`;
+    modalHtml += `<button id="closeSettingsBtn" style="margin-top:16px;">Close</button></div></div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('closeSettingsBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.remove());
+    document.getElementById('neonColorPicker')?.addEventListener('change', (e) => { localStorage.setItem('neonColor', e.target.value); document.documentElement.style.setProperty('--neon', e.target.value); });
+    if (isAdmin()) document.getElementById('saveAdminSettings')?.addEventListener('click', () => { geminiApiKey = document.getElementById('geminiApiKeyInput').value; localStorage.setItem('geminiApiKey', geminiApiKey); alert("Saved."); });
+  }
+  
+  // ==================== DaisyAI ====================
+  let recognition;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+  }
+  async function callGemini(prompt) {
+    if (!geminiApiKey) return null;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch(e) { return null; }
+  }
+  async function processAIQuery(query) {
+    const messagesDiv = document.getElementById("aiMessages");
+    messagesDiv.innerHTML += `<div><b>You:</b> ${query}</div>`;
+    let reply = "";
+    if (geminiApiKey) {
+      const geminiReply = await callGemini(query);
+      if (geminiReply) reply = geminiReply;
+      else reply = "Gemini error. Check key in settings.";
+    } else {
+      if (query.toLowerCase().includes("case")) reply = `Active case #${activeCase.id || "none"} with ${activeCase.evidence.length} evidence items.`;
+      else if (query.toLowerCase().includes("procedure")) reply = "Follow the AI Investigation Director phases. Current phase: " + (getNextStep()?.phase || "Complete");
+      else if (query.toLowerCase().includes("evidence")) reply = "Use Investigate tab for footprint/tire analysis and thermal imaging.";
+      else reply = "Try 'case', 'procedure', or 'evidence'.";
+    }
+    messagesDiv.innerHTML += `<div><b>🤖 DaisyAI Forensic:</b> ${reply}</div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    speak(reply);
+  }
+  function startVoiceAI() {
+    if (!recognition) { alert("STT not supported"); return; }
+    recognition.start();
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      document.getElementById("aiInput").value = text;
+      processAIQuery(text);
+    };
+  }
+  document.getElementById("voiceInputBtn")?.addEventListener("click", startVoiceAI);
+  document.getElementById("sendAiBtn")?.addEventListener("click", () => {
+    const input = document.getElementById("aiInput");
+    if (input.value.trim()) processAIQuery(input.value);
+    input.value = "";
+  });
+  
+  // ==================== Initialization ====================
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedNeon = localStorage.getItem('neonColor');
+    if (savedNeon) document.documentElement.style.setProperty('--neon', savedNeon);
+    const storedUser = localStorage.getItem('daisyInvestUser');
+    if (storedUser) currentUser = JSON.parse(storedUser);
+    
+    // Load saved investigation state
+    const savedPhases = localStorage.getItem("investigationPhases");
+    if (savedPhases) investigationPhases = JSON.parse(savedPhases);
+    
+    render();
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => { currentScreen = btn.dataset.nav; render(); });
+    });
+    document.getElementById('settingsBtn')?.addEventListener('click', openSettings);
+    const aiModal = document.getElementById('aiModal');
+    document.getElementById('floatingAiBtn')?.addEventListener('click', () => { aiModal.style.display = aiModal.style.display === 'flex' ? 'none' : 'flex'; });
+    document.getElementById('closeAiModal')?.addEventListener('click', () => aiModal.style.display = 'none');
+  });
+</script>
+</body>
+        </html>
