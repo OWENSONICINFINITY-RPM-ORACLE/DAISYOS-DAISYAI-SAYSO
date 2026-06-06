@@ -708,4 +708,29 @@
     };
   }
   document.getElementById("voiceInputBtn")?.addEventListener("click", startVoiceAI);
-  document.getElementById("sendAiBtn")?.addEventListener("click
+  document.getElementById("sendAiBtn")?.addEventListener("click", () => {
+    const input = document.getElementById("aiInput");
+    if (input.value.trim()) processAIQuery(input.value);
+    input.value = "";
+  });
+
+  // ==================== Initialization ====================
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedNeon = localStorage.getItem('neonColor');
+    if (savedNeon) document.documentElement.style.setProperty('--neon', savedNeon);
+    customBgImage = localStorage.getItem("customBgImage") || "";
+    if (customBgImage) document.body.style.background = `url('${customBgImage}') center/cover fixed`;
+    const storedUser = localStorage.getItem('daisyObjectsUser');
+    if (storedUser) currentUser = JSON.parse(storedUser);
+    render();
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => { currentScreen = btn.dataset.nav; render(); });
+    });
+    document.getElementById('settingsBtn')?.addEventListener('click', openSettings);
+    const aiModal = document.getElementById('aiModal');
+    document.getElementById('floatingAiBtn')?.addEventListener('click', () => { aiModal.style.display = aiModal.style.display === 'flex' ? 'none' : 'flex'; });
+    document.getElementById('closeAiModal')?.addEventListener('click', () => aiModal.style.display = 'none');
+  });
+</script>
+</body>
+</html>
