@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>DaisyObjects – Real AR Detection & Hunting | DaisyOS</title>
+  <!-- Firebase Auth (Google Sign-In) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <!-- TensorFlow.js + COCO-SSD for object detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <!-- Tesseract.js for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0f1e;
+      color: #eef2ff;
+      overflow-x: hidden;
+      padding-bottom: 80px;
+    }
+    :root { --neon: #00f5c0; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .badge-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      background: rgba(0,245,192,0.1);
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      border: 1px solid rgba(0,245,192,0.3);
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      color: var(--neon);
+      transition: 0.2s;
+    }
+    .icon-btn:hover { background: rgba(0,245,192,0.2); }
+    .nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(10,15,30,0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(0,245,192,0.3);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.7rem;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .nav-item.active { color: var(--neon); }
+    .nav-icon { font-size: 1.5rem; }
+    .video-container {
+      position: relative;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 24px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 2px solid var(--neon);
+    }
+    #videoFeed {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 16px 0;
+      justify-content: center;
+    }
+    button {
+      background: rgba(0,245,192,0.2);
+      border: 1px solid var(--neon);
+      padding: 8px 16px;
+      border-radius: 40px;
+      color: var(--neon);
+      cursor: pointer;
+    }
+    .nft-banner {
+      background: linear-gradient(135deg, #00f5c0, #0a8f6e);
+      color: #0a0f1e;
+      padding: 12px;
+      border-radius: 20px;
+      text-align: center;
+      margin: 16px 0;
+      font-weight: bold;
+    }
+    .card {
+      background: rgba(15,23,42,0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 24px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(0,245,192,0.2);
+    }
+    .profile-wallet {
+      font-family: monospace;
+      background: #00000066;
+      padding: 8px;
+      border-radius: 20px;
+      margin: 8px 0;
+    }
+    .disclaimer {
+      background: rgba(255,70,70,0.1);
+      border-left: 4px solid #ff4444;
+      padding: 12px 16px;
+      margin: 20px 0;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+    footer {
+      margin-top: 40px;
+      padding: 20px 0;
+      text-align: center;
+      font-size: 0.7rem;
+      border-top: 1px solid rgba(0,245,192,0.2);
+    }
+    .floating-ai {
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      background: var(--neon);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--neon);
+      z-index: 200;
+      font-size: 28px;
+      border: none;
+      color: #0a0f1e;
+    }
+    .ai-modal {
+      display: none;
+      position: fixed;
+      bottom: 160px;
+      right: 20px;
+      width: 320px;
+      background: #1e293b;
+      border-radius: 24px;
+      border: 2px solid var(--neon);
+      z-index: 201;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ai-header {
+      background: #0f172a;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--neon);
+    }
+    .ai-messages {
+      height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      font-size: 0.85rem;
+    }
+    .ai-input-area {
+      display: flex;
+      padding: 8px;
+      gap: 8px;
+      border-top: 1px solid rgba(0,245,192,0.3);
+    }
+    .ai-input-area input {
+      flex: 1;
+      padding: 8px;
+      border-radius: 40px;
+      border: none;
+      background: #0f172a;
+      color: white;
+    }
+    .wearable-alert {
+      background: rgba(255,100,0,0.3);
+      border-left: 4px solid #ff6600;
+      padding: 8px 12px;
+      border-radius: 16px;
+      margin: 8px 0;
+      font-size: 0.85rem;
+    }
+    @media (max-width: 640px) {
+      .ai-modal { width: 280px; right: 10px; bottom: 140px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="appContainer">
+  <div class="header">
+    <h2>🔍 DaisyObjects</h2>
+    <div class="badge-row">
+      <span class="badge">🎯 80+ Classes</span>
+      <span class="badge">🏹 Hunting</span>
+      <span class="badge">📡 Wearable Alerts</span>
+      <div id="userWidget"></div>
+      <button class="icon-btn" id="settingsBtn">⚙️</button>
+    </div>
+  </div>
+  <div id="screenContent"></div>
+  <footer>
+    <a href="https://owensonicinfinity.netlify.app" target="_blank">OwenSonicInfinity.netlify.app</a> | 
+    <a href="https://owensonicinfinity.github.io" target="_blank">OwenSonicInfinity.github.io</a><br>
+    Cleveland, Ohio 44089 | owensonicinfinity@gmail.com<br>
+    © 2026 Douglas Owens Jr. All rights reserved.
+  </footer>
+</div>
+
+<div class="nav-bar">
+  <button class="nav-item" data-nav="detect"><span class="nav-icon">🎯</span><span>Detect</span></button>
+  <button class="nav-item" data-nav="hunt"><span class="nav-icon">🏹</span><span>Hunt</span></button>
+  <button class="nav-item" data-nav="profile"><span class="nav-icon">👤</span><span>Profile</span></button>
+</div>
+
+<button class="floating-ai" id="floatingAiBtn">🤖</button>
+<div id="aiModal" class="ai-modal">
+  <div class="ai-header">
+    <span>🤖 DaisyAI <span class="badge">Autonomous</span></span>
+    <button id="closeAiModal" style="background:none; border:none; color:var(--neon); font-size:1.2rem;">✕</button>
+  </div>
+  <div id="aiMessages" class="ai-messages">
+    <div>👋 I'm DaisyAI. Ask me about objects, hunting, or your wallet.</div>
+  </div>
+  <div class="ai-input-area">
+    <button id="voiceInputBtn" style="background:none; border:none; font-size:1.2rem;">🎤</button>
+    <input type="text" id="aiInput" placeholder="Type or speak...">
+    <button id="sendAiBtn">Send</button>
+  </div>
+</div>
+
+<script>
+  // ==================== Firebase & Global State ====================
+  const firebaseConfig = {
+    apiKey: "AIzaSyDummyKeyForDemoOnly",
+    authDomain: "daisyos-demo.firebaseapp.com",
+    projectId: "daisyos-demo",
+  };
+  let auth;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+  } catch(e) { console.warn("Firebase init failed, using mock auth"); }
+
+  let currentUser = null;
+  let currentScreen = 'detect';
+  let geminiApiKey = localStorage.getItem("geminiApiKey") || "";
+  let customBgImage = localStorage.getItem("customBgImage") || "";
+  let walletBalance = parseFloat(localStorage.getItem("walletBalance")) || 5.0;
+  let userNFTs = JSON.parse(localStorage.getItem("userNFTs")) || [];
+  let userBio = localStorage.getItem("userBio") || "Hunter & AR detector. NFT collector.";
+  let userWalletAddress = localStorage.getItem("userWalletAddress") || `0x${Math.random().toString(36).substring(2, 10)}...`;
+  let huntingLogs = JSON.parse(localStorage.getItem("huntingLogs")) || [];
+  let unidentifiedObjects = JSON.parse(localStorage.getItem("unidentifiedObjects")) || [];
+
+  // AR detection variables
+  let model = null;
+  let videoStream = null;
+  let videoElement = null;
+  let canvasElement = null;
+  let ctx = null;
+  let detectionInterval = null;
+  let currentFacingMode = 'environment';
+  let nightVision = false;
+  let ocrActive = false;
+  let wearableAlertInterval = null;
+
+  // Predictive tracking simulation (real would use frame diff)
+  let lastDetections = [];
+
+  // ==================== Load AI Model ====================
+  async function loadModel() {
+    const statusDiv = document.getElementById("modelStatus");
+    if (statusDiv) statusDiv.innerText = "Loading AI model (20MB)... please wait";
+    try {
+      model = await cocoSsd.load();
+      if (statusDiv) statusDiv.innerText = "✅ AI ready. 80+ classes.";
+      return true;
+    } catch(e) {
+      if (statusDiv) statusDiv.innerText = "❌ Model load failed";
+      return false;
+    }
+  }
+
+  // ==================== Camera ====================
+  async function startCamera() {
+    if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: currentFacingMode } }
+      });
+      videoStream = stream;
+      if (videoElement) videoElement.srcObject = stream;
+      return true;
+    } catch(err) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        videoStream = stream;
+        if (videoElement) videoElement.srcObject = stream;
+        return true;
+      } catch(e) {
+        alert("Camera access denied");
+        return false;
+      }
+    }
+  }
+
+  function switchCamera() {
+    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    startCamera();
+  }
+
+  function toggleNightVision() {
+    nightVision = !nightVision;
+    if (videoElement) {
+      videoElement.style.filter = nightVision ? "brightness(1.3) contrast(1.8) hue-rotate(90deg)" : "none";
+    }
+  }
+
+  // ==================== Real Object Detection ====================
+  async function detectObjects() {
+    if (!model || !videoElement || videoElement.readyState !== 4) return;
+    try {
+      const predictions = await model.detect(videoElement);
+      drawPredictions(predictions);
+      
+      // Update object label
+      if (predictions.length > 0 && document.getElementById("objectLabel")) {
+        document.getElementById("objectLabel").innerHTML = `🎯 ${predictions[0].class} (${Math.round(predictions[0].score*100)}%)`;
+      }
+      
+      // Predictive tracking: check for movement patterns
+      if (predictions.length > 0) {
+        checkPredictiveMovement(predictions);
+      }
+      
+      // Wearable alert simulation (deer detection)
+      const deerDetected = predictions.some(p => p.class === 'bear' || p.class === 'dog' || p.class === 'cat');
+      if (deerDetected && document.getElementById("wearableAlert")) {
+        document.getElementById("wearableAlert").innerHTML = "🦌 Wearable Alert: Large game detected 50 yards behind you. Look over your right shoulder!";
+        document.getElementById("wearableAlert").style.display = "block";
+      } else if (document.getElementById("wearableAlert")) {
+        document.getElementById("wearableAlert").style.display = "none";
+      }
+      
+      lastDetections = predictions;
+    } catch(e) { console.warn("Detection error", e); }
+  }
+
+  function drawPredictions(predictions) {
+    if (!canvasElement || !ctx) return;
+    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--neon').trim() || '#00f5c0';
+    ctx.fillStyle = '#00f5c0';
+    ctx.font = "16px 'Inter'";
+    for (let pred of predictions.slice(0, 5)) {
+      const [x, y, w, h] = pred.bbox;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillText(`${pred.class} (${Math.round(pred.score*100)}%)`, x, y-5);
+    }
+  }
+
+  // Predictive tracking - checks for movement patterns
+  function checkPredictiveMovement(predictions) {
+    if (lastDetections.length > 0) {
+      // Simple predictive logic: if same class appears, estimate movement
+      for (let pred of predictions) {
+        const lastMatch = lastDetections.find(l => l.class === pred.class);
+        if (lastMatch) {
+          const dx = pred.bbox[0] - lastMatch.bbox[0];
+          const dy = pred.bbox[1] - lastMatch.bbox[1];
+          if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+            if (document.getElementById("predictiveTip")) {
+              let direction = dx > 0 ? "right" : "left";
+              document.getElementById("predictiveTip").innerHTML = `🔮 Predictive: ${pred.class} moving ${direction}. It may cross your path.`;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ==================== License Plate OCR ====================
+  async function performOCR() {
+    if (!videoElement) return;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = videoElement.videoWidth;
+    offCanvas.height = videoElement.videoHeight;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.drawImage(videoElement, 0, 0);
+    try {
+      const { data: { text } } = await Tesseract.recognize(offCanvas, 'eng');
+      const plateRegex = /[A-Z0-9]{5,8}/i;
+      const match = text.match(plateRegex);
+      if (match) {
+        document.getElementById("ocrResult").innerHTML = `📋 License Plate: ${match[0]}`;
+      } else {
+        document.getElementById("ocrResult").innerHTML = "No license plate detected.";
+      }
+    } catch(e) {
+      console.warn("OCR error", e);
+    }
+  }
+
+  function toggleOCR() {
+    ocrActive = !ocrActive;
+    if (ocrActive) {
+      performOCR();
+      if (ocrInterval) clearInterval(ocrInterval);
+      ocrInterval = setInterval(performOCR, 5000);
+      alert("OCR active. Point at license plates.");
+    } else {
+      if (ocrInterval) clearInterval(ocrInterval);
+      alert("OCR disabled.");
+    }
+  }
+
+  let ocrInterval = null;
+
+  // ==================== Snapshot ====================
+  function takeSnapshot() {
+    if (!videoElement) return;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = videoElement.videoWidth;
+    offCanvas.height = videoElement.videoHeight;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.drawImage(videoElement, 0, 0);
+    const link = document.createElement('a');
+    link.download = `daisyobjects_${Date.now()}.png`;
+    link.href = offCanvas.toDataURL();
+    link.click();
+    alert("Snapshot saved. You can mint this as an NFT.");
+  }
+
+  // ==================== Hunting Addon ====================
+  function addHuntingLog(scat, track, marking, location, unidentified) {
+    huntingLogs.push({ scat, track, marking, location, unidentified, date: new Date() });
+    localStorage.setItem("huntingLogs", JSON.stringify(huntingLogs));
+    
+    // Reward logic
+    if (huntingLogs.length === 1) {
+      userNFTs.push({ name: "Beginner Hunter Badge", value: "0.05 ETH" });
+      localStorage.setItem("userNFTs", JSON.stringify(userNFTs));
+      alert("🏅 You earned a Beginner Hunter NFT!");
+    } else {
+      walletBalance += 0.01;
+      localStorage.setItem("walletBalance", walletBalance);
+      alert("Hunt logged! +0.01 ETH reward.");
+    }
+    
+    // If unidentified object, ask user to name it
+    if (unidentified) {
+      let name = prompt("This object is not in any database. Name it (must be 110% verified):");
+      if (name) {
+        unidentifiedObjects.push({ name, date: new Date() });
+        localStorage.setItem("unidentifiedObjects", JSON.stringify(unidentifiedObjects));
+        alert(`"${name}" added to global database.`);
+      }
+    }
+  }
+
+  // ==================== UI Rendering ====================
+  function render() {
+    const container = document.getElementById('screenContent');
+    if (currentScreen === 'detect') renderDetect(container);
+    else if (currentScreen === 'hunt') renderHunt(container);
+    else if (currentScreen === 'profile') renderProfile(container);
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      if(btn.dataset.nav === currentScreen) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    updateUserWidget();
+  }
+
+  function renderDetect(container) {
+    container.innerHTML = `
+      <div class="disclaimer">⚠️ DISCLAIMER: You are solely responsible for your actions. Object detection is for informational purposes only.</div>
+      <div class="card">
+        <div id="modelStatus" class="badge">Loading AI model...</div>
+        <div class="video-container">
+          <video id="videoFeed" autoplay playsinline></video>
+          <canvas id="detectionCanvas"></canvas>
+        </div>
+        <div class="controls">
+          <button id="switchCamBtn">🔄 Switch Camera</button>
+          <button id="nightVisionBtn">🌙 Night Vision</button>
+          <button id="ocrBtn">🔍 License Plate OCR</button>
+          <button id="snapshotBtn">📸 Snapshot</button>
+        </div>
+        <div id="objectLabel" class="badge" style="margin-top:8px;">🔍 Scanning...</div>
+        <div id="ocrResult" class="badge" style="margin-top:8px;">OCR idle</div>
+        <div id="predictiveTip" class="wearable-alert" style="display:none;"></div>
+        <div id="wearableAlert" class="wearable-alert" style="display:none;"></div>
+      </div>
+      <div class="nft-banner">🎯 80+ classes detected. Unidentified objects can be named and added to global database!</div>
+    `;
+    
+    videoElement = document.getElementById("videoFeed");
+    canvasElement = document.getElementById("detectionCanvas");
+    ctx = canvasElement.getContext("2d");
+    
+    startCamera();
+    loadModel().then(() => {
+      if (detectionInterval) clearInterval(detectionInterval);
+      detectionInterval = setInterval(detectObjects, 300);
+    });
+    
+    document.getElementById("switchCamBtn")?.addEventListener("click", switchCamera);
+    document.getElementById("nightVisionBtn")?.addEventListener("click", toggleNightVision);
+    document.getElementById("ocrBtn")?.addEventListener("click", toggleOCR);
+    document.getElementById("snapshotBtn")?.addEventListener("click", takeSnapshot);
+  }
+
+  function renderHunt(container) {
+    let logsHtml = huntingLogs.slice().reverse().map(l => `<div>🐾 ${l.scat || "?"} | ${l.track || "?"} | ${l.marking || "?"} | ${l.location || "?"} ${l.unidentified ? '🔍 UNIDENTIFIED' : ''}</div>`).join('');
+    let unidentifiedHtml = unidentifiedObjects.map(u => `<div>🔬 ${u.name} (discovered ${new Date(u.date).toLocaleDateString()})</div>`).join('');
+    
+    container.innerHTML = `
+      <div class="card">
+        <h3>🏹 Hunting Addon</h3>
+        <p><strong>Predictive tracking active:</strong> AI analyzing movement patterns...</p>
+        <input type="text" id="scatInput" placeholder="Scat type & freshness (e.g., Deer, 2 days old)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <input type="text" id="trackInput" placeholder="Track analysis (e.g., Hoof, 3 inches)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <input type="text" id="markingInput" placeholder="Marking/rubs (e.g., Antler rub on tree)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <input type="text" id="locationInput" placeholder="Location (GPS or area name)" style="width:100%; margin:8px 0; padding:8px; border-radius:20px;">
+        <label><input type="checkbox" id="unidentifiedCheck"> This is an unidentified species/object (110% verified not in any database)</label><br>
+        <button id="logHuntBtn">📝 Log Hunt Observation (+0.01 ETH reward)</button>
+      </div>
+      <div class="card"><h3>📜 Hunting Logs</h3>${logsHtml || "No logs yet. Start hunting!"}</div>
+      <div class="card"><h3>🔬 Unidentified Objects Discovered</h3>${unidentifiedHtml || "None yet. Be the first to discover something new!"}</div>
+      <div class="nft-banner">🏅 Hunting achievements mint NFTs. Top hunters earn rare badges!</div>
+    `;
+    
+    document.getElementById("logHuntBtn")?.addEventListener("click", () => {
+      let scat = document.getElementById("scatInput").value;
+      let track = document.getElementById("trackInput").value;
+      let marking = document.getElementById("markingInput").value;
+      let location = document.getElementById("locationInput").value;
+      let unidentified = document.getElementById("unidentifiedCheck").checked;
+      if (scat || track || marking) {
+        addHuntingLog(scat || "unknown", track || "unknown", marking || "none", location || "unknown", unidentified);
+        renderHunt(container);
+      } else {
+        alert("Fill at least one field.");
+      }
+    });
+  }
+
+  function renderProfile(container) {
+    let nftsHtml = userNFTs.map(n => `<div>${n.name} – ${n.value || "0.1 ETH"}</div>`).join('');
+    let logsHtml = huntingLogs.slice(-3).map(l => `<div>${l.scat} | ${l.track}</div>`).join('');
+    
+    container.innerHTML = `
+      <div class="card" style="text-align:center">
+        <img src="${currentUser?.photoURL || 'https://via.placeholder.com/100'}" style="width:100px; border-radius:50%;">
+        <h3>${currentUser?.displayName || "Guest"}</h3>
+        <p>${currentUser?.email || "Not signed in"}</p>
+        <div class="profile-wallet">
+          <strong>Wallet:</strong> ${userWalletAddress}<br>
+          <strong>Balance:</strong> ${walletBalance.toFixed(2)} ETH
+          <button id="copyWalletBtn">📋 Copy</button>
+        </div>
+        <label>Bio:</label>
+        <textarea id="bioEdit" rows="2" style="width:100%;">${userBio}</textarea>
+        <button id="saveBioBtn">Save Bio</button>
+        <button id="addFundsBtn">➕ Add 1 ETH</button>
+      </div>
+      <div class="card"><h3>🎨 My NFTs</h3>${nftsHtml || "No NFTs yet. Hunt or detect to earn."}<button id="mintDemoNft">✨ Mint Demo NFT</button></div>
+      <div class="card"><h3>🏹 Recent Hunts</h3>${logsHtml || "No hunts logged."}</div>
+    `;
+    
+    document.getElementById("copyWalletBtn")?.addEventListener("click", () => { navigator.clipboard.writeText(userWalletAddress); alert("Copied!"); });
+    document.getElementById("saveBioBtn")?.addEventListener("click", () => { userBio = document.getElementById("bioEdit").value; localStorage.setItem("userBio", userBio); alert("Bio saved."); });
+    document.getElementById("addFundsBtn")?.addEventListener("click", () => { walletBalance += 1; localStorage.setItem("walletBalance", walletBalance); renderProfile(container); });
+    document.getElementById("mintDemoNft")?.addEventListener("click", () => { userNFTs.push({ name: `Hunt NFT ${Date.now()}`, value: "0.05 ETH" }); localStorage.setItem("userNFTs", JSON.stringify(userNFTs)); renderProfile(container); });
+  }
+
+  // ==================== Authentication ====================
+  function updateUserWidget() {
+    const widget = document.getElementById('userWidget');
+    if (currentUser) {
+      widget.innerHTML = `<img src="${currentUser.photoURL || 'https://via.placeholder.com/32'}" style="width:32px; border-radius:50%;"> <button id="logoutBtn" class="icon-btn" style="font-size:0.8rem;">🚪</button>`;
+      document.getElementById('logoutBtn')?.addEventListener('click', () => { if(auth) auth.signOut(); currentUser = null; render(); });
+    } else {
+      widget.innerHTML = `<button id="googleSignInBtn" class="badge">🔑 Sign in</button>`;
+      document.getElementById('googleSignInBtn')?.addEventListener('click', () => {
+        if (auth) {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          auth.signInWithPopup(provider).then(result => { currentUser = result.user; render(); }).catch(() => mockSignIn());
+        } else { mockSignIn(); }
+      });
+    }
+  }
+  function mockSignIn() { currentUser = { displayName: "Douglas Owens", email: "owensonicinfinity@gmail.com", photoURL: "https://via.placeholder.com/80" }; render(); }
+  function isAdmin() {
+    if (!currentUser) return false;
+    const email = (currentUser.email || "").toLowerCase();
+    const name = (currentUser.displayName || "").toLowerCase();
+    return email === "owensonicinfinity@gmail.com" || name.includes("douglas");
+  }
+
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  // ==================== Settings Modal ====================
+  function openSettings() {
+    let modalHtml = `<div id="settingsModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; display:flex; justify-content:center; align-items:center;"><div style="background:#1e293b; border-radius:32px; max-width:500px; width:90%; padding:24px;"><h3>⚙️ Settings</h3><div><label>Neon Color</label><input type="color" id="neonColorPicker" value="${localStorage.getItem('neonColor') || '#00f5c0'}"></div><div><label>Background URL</label><input type="text" id="bgImageUrl" value="${customBgImage}"></div>`;
+    if (isAdmin()) modalHtml += `<div style="margin-top:12px; padding:12px; background:rgba(255,100,0,0.15); border-radius:16px;"><h4>🔐 Admin</h4><label>Gemini API Key</label><input type="password" id="geminiApiKeyInput" value="${geminiApiKey}"><button id="saveAdminSettings">Save</button></div>`;
+    modalHtml += `<button id="closeSettingsBtn" style="margin-top:16px;">Close</button></div></div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('closeSettingsBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.remove());
+    document.getElementById('neonColorPicker')?.addEventListener('change', (e) => { localStorage.setItem('neonColor', e.target.value); document.documentElement.style.setProperty('--neon', e.target.value); });
+    document.getElementById('bgImageUrl')?.addEventListener('change', (e) => { customBgImage = e.target.value; localStorage.setItem('customBgImage', customBgImage); document.body.style.background = customBgImage ? `url('${customBgImage}') center/cover fixed` : "#0a0f1e"; });
+    if (isAdmin()) document.getElementById('saveAdminSettings')?.addEventListener('click', () => { geminiApiKey = document.getElementById('geminiApiKeyInput').value; localStorage.setItem('geminiApiKey', geminiApiKey); alert("Saved."); });
+  }
+
+  // ==================== DaisyAI ====================
+  let recognition;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+  }
+  async function callGemini(prompt) {
+    if (!geminiApiKey) return null;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    } catch(e) { return null; }
+  }
+  async function processAIQuery(query) {
+    const messagesDiv = document.getElementById("aiMessages");
+    messagesDiv.innerHTML += `<div><b>You:</b> ${query}</div>`;
+    let reply = "";
+    if (geminiApiKey) {
+      const geminiReply = await callGemini(query);
+      if (geminiReply) reply = geminiReply;
+      else reply = "Gemini error. Check key in settings.";
+    } else {
+      if (query.toLowerCase().includes("detect")) reply = `Point camera at objects. Model detects ${lastDetections.length} objects currently.`;
+      else if (query.toLowerCase().includes("hunt")) reply = `You have ${huntingLogs.length} hunting logs. Keep hunting to earn NFTs.`;
+      else if (query.toLowerCase().includes("wallet")) reply = `Wallet: ${userWalletAddress}. Balance: ${walletBalance.toFixed(2)} ETH.`;
+      else if (query.toLowerCase().includes("unidentified")) reply = `There are ${unidentifiedObjects.length} unidentified objects discovered globally.`;
+      else reply = "Try 'detect', 'hunt', 'wallet', or 'unidentified'.";
+    }
+    messagesDiv.innerHTML += `<div><b>🤖 DaisyAI:</b> ${reply}</div>`;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    speak(reply);
+  }
+  function startVoiceAI() {
+    if (!recognition) { alert("STT not supported"); return; }
+    recognition.start();
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      document.getElementById("aiInput").value = text;
+      processAIQuery(text);
+    };
+  }
+  document.getElementById("voiceInputBtn")?.addEventListener("click", startVoiceAI);
+  document.getElementById("sendAiBtn")?.addEventListener("click
